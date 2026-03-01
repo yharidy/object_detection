@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+.python-version
+.venv/
+venv/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Data
+data/raw/
+data/processed/
+
+# Outputs
+outputs/
+wandb/
+
+# OS
+.DS_Store
+.DS_Store?
+
+# Large files
+*.zip
+*.tar.gz

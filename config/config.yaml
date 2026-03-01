@@ -1,0 +1,57 @@
+# Object Detection Configuration
+
+# Dataset settings
+dataset:
+  name: "waym"
+  path: "data/raw"
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  num_workers: 4
+
+# Model settings
+model:
+  type: "yolov8"  # or "custom_2d", "custom_3d"
+  backbone: "resnet50"
+  pretrained: true
+  num_classes: 1  # Adjust based on WAYM dataset classes
+
+# Training settings
+training:
+  batch_size: 16
+  num_epochs: 100
+  learning_rate: 0.001
+  weight_decay: 0.0005
+  optimizer: "adam"
+  scheduler: "cosine"
+  amp: true  # Automatic mixed precision
+
+# Augmentation settings
+augmentation:
+  enabled: true
+  brightness: 0.2
+  contrast: 0.2
+  saturation: 0.2
+  hue: 0.1
+  rotation: 15
+  scale: 0.1
+  flip_horizontal: 0.5
+  flip_vertical: 0.1
+
+# Validation settings
+validation:
+  interval: 5  # Validate every N epochs
+  save_best: true
+  metric: "mAP"
+
+# Logging and checkpointing
+logging:
+  log_dir: "outputs/logs"
+  tensorboard: true
+  save_interval: 5  # Save checkpoint every N epochs
+  checkpoint_dir: "models/checkpoints"
+
+# Device settings
+device:
+  type: "cuda"  # or "cpu"
+  mixed_precision: true
