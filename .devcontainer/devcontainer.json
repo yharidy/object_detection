@@ -1,7 +1,9 @@
 {
-  "name": "Object Detection WAYM",
-  "dockerfile": "Dockerfile",
-  "context": "..",
+  "name": "Object Detection",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
@@ -39,6 +41,7 @@
   "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt",
   "remoteUser": "vscode",
   "mounts": [
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,readonly"
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached,readonly",
+    "source=/Users/youssef/Desktop/object_detection/data,target=/workspace/data,type=bind,consistency=cached"
   ]
 }

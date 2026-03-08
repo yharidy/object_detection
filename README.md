@@ -1,6 +1,6 @@
 # Object Detection with WAYM Dataset
 
-A PyTorch-based 2D/3D object detection framework built for the WAYM (World Archive of Yolo Models) dataset.
+A PyTorch-based 2D/3D object detection framework built for the WAYMO dataset.
 
 ## Project Structure
 
@@ -48,7 +48,7 @@ pip install -r requirements.txt
 
 ## Dataset
 
-The WAYM dataset should be placed in the `data/raw/` directory. Follow the dataset provider's instructions for downloading and organizing the data.
+The WAYMO dataset should be placed in the `data/raw/` directory. Follow WAYMO's instructions for downloading and organizing the data.
 
 ## Quick Start
 
