@@ -127,6 +127,7 @@ dmypy.json
 .DS_Store
 
 # Data directories
+data/
 data/raw/
 data/processed/
 data/external/

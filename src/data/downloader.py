@@ -1,3 +1,10 @@
+"""Waymo Open Dataset Downloader.
+
+This module provides functionality to download data from the Waymo Open Dataset
+hosted on Google Cloud Storage. It supports downloading camera images, lidar data,
+calibrations, and ground truth labels for training, validation, and test splits.
+"""
+
 import logging
 import os
 import threading
@@ -17,12 +24,16 @@ logging.basicConfig(
 
 
 class DatasetSplit(Enum):
+    """Enum for dataset splits."""
+
     TRAINING = "training"
     VALIDATION = "validation"
     TEST = "testing"
 
 
 class Stream(Enum):
+    """Enum for data streams."""
+
     CAMERA = "camera"
     LIDAR = "lidar"
 
@@ -43,6 +54,12 @@ _thread_local = threading.local()
 
 
 def get_client():
+    """Get a thread-local Google Cloud Storage client.
+
+    Returns:
+        storage.Client: A GCS client instance.
+    """
+
     def setup_client():
         try:
             client = storage.Client()
@@ -58,15 +75,35 @@ def get_client():
 def select_segments_from_folder(
     bucket: storage.Bucket, path_to_folder: str, num_segments: int
 ) -> list:
-    selected_segments = [blob.name.split('/')[-1] for blob in bucket.list_blobs(prefix=path_to_folder, max_results=num_segments)]
+    """Select a specified number of segments from a GCS folder.
+
+    Args:
+        bucket: GCS bucket object.
+        path_to_folder: Path to the folder in the bucket.
+        num_segments: Number of segments to select.
+
+    Returns:
+        List of segment names.
+    """
+    selected_segments = [
+        blob.name.split("/")[-1]
+        for blob in bucket.list_blobs(prefix=path_to_folder, max_results=num_segments)
+    ]
     logger.info(
         f"Selected {len(selected_segments)} segments from folder {path_to_folder}."
     )
     return selected_segments
 
 
-
 def download_file(bucket_name, folder, filename, output_dir):
+    """Download a single file from GCS.
+
+    Args:
+        bucket_name: Name of the GCS bucket.
+        folder: Folder path in the bucket.
+        filename: Name of the file to download.
+        output_dir: Local directory to save the file.
+    """
     client = get_client()
     bucket = client.bucket(bucket_name)
 
@@ -133,13 +170,20 @@ def download_file(bucket_name, folder, filename, output_dir):
     help="Maximum number of parallel workers to use for downloading",
 )
 def main(split, streams, master_stream, version, num_segments, output_dir, max_workers):
+    """Download Waymo Open Dataset segments from Google Cloud Storage.
+
+    This command downloads camera images, lidar data, calibrations, and ground truth
+    labels for the specified dataset split and streams.
+    """
     if output_dir is None:
         output_dir = os.path.join("data", "waymo", version, split)
     os.makedirs(output_dir, exist_ok=True)
 
     for stream in streams:
         if stream not in [e.value for e in Stream]:
-            raise ValueError(f"Stream '{stream}' is not recognized. Valid options are: {[e.value for e in Stream]}")
+            raise ValueError(
+                f"Stream '{stream}' is not recognized. Valid options are: {[e.value for e in Stream]}"
+            )
 
     # set up client
     client = get_client()
@@ -163,23 +207,33 @@ def main(split, streams, master_stream, version, num_segments, output_dir, max_w
     # Download blobs in parallel
     folders_to_download = []
     for stream in streams:
-        folders_to_download.append(f"{split}/{RAW_DATA_FOLDER.get(version, {}).get(Stream(stream))}")
-        folders_to_download.append(f"{split}/{CALIBRATION_FOLDER.get(version, {}).get(Stream(stream))}")
-        folders_to_download.append(f"{split}/{GT_LABEL_FOLDER.get(version, {}).get(Stream(stream))}")
-    
+        folders_to_download.append(
+            f"{split}/{RAW_DATA_FOLDER.get(version, {}).get(Stream(stream))}"
+        )
+        folders_to_download.append(
+            f"{split}/{CALIBRATION_FOLDER.get(version, {}).get(Stream(stream))}"
+        )
+        folders_to_download.append(
+            f"{split}/{GT_LABEL_FOLDER.get(version, {}).get(Stream(stream))}"
+        )
+
     files_to_download = [
         (folder, segment)
         for segment in selected_segments
         for folder in folders_to_download
     ]
-    
+
     logger.info(f"Total files to download: {len(files_to_download)}")
-    logger.info(f"Segments selected: {len(selected_segments)}, Folders: {len(folders_to_download)}")
-    
+    logger.info(
+        f"Segments selected: {len(selected_segments)}, Folders: {len(folders_to_download)}"
+    )
+
     if len(files_to_download) == 0:
-        logger.warning("No files to download. Check if segments were selected correctly.")
+        logger.warning(
+            "No files to download. Check if segments were selected correctly."
+        )
         return
-    
+
     download_worker = partial(
         download_file, bucket_name=bucket_name, output_dir=output_dir
     )
