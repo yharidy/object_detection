@@ -12,7 +12,12 @@ logger = get_logger(__name__)
 
 
 class WaymoSegment:
-    """Class representing a Waymo Open Dataset segment. Provides methods to load and access frames from the segment, as well as the sensor rig information."""
+    """Class representing a Waymo Open Dataset segment.
+
+    A WaymoSegment acts as the dataset entry point for a single segment. It
+    initializes the Parquet-backed store and the frame parser, loads the sensor
+    rig information, and provides indexed access to parsed frames.
+    """
 
     def __init__(
         self,
@@ -35,6 +40,8 @@ class WaymoSegment:
             load_point_clouds: Whether to load point clouds for the lidars. If True,
                 the point clouds will be converted from the range images using the provided calibrations.
             lidar_returns: List of return indices to load for each lidar. If None, loads only the first return.
+            load_camera_labels: Whether to load camera bounding boxes for each frame.
+            load_lidar_labels: Whether to load LiDAR bounding boxes for each frame.
         """
         logger.info(
             f"Initializing WaymoSegment with segment_name='{segment_name}', root_dir='{root_dir}', cameras={cameras}, lidars={lidars}, load_point_clouds={load_point_clouds}, lidar_returns={lidar_returns}"
@@ -52,7 +59,7 @@ class WaymoSegment:
         self._load()
 
     def _load(self):
-        # called once during initialization to load sensor rig and frame timestamps
+        """Load the segment sensor rig and timestamp index."""
         # load calibrations
         camera_calib_df = (
             self.store.load_camera_calibrations(self.cameras) if self.cameras else None
@@ -80,6 +87,7 @@ class WaymoSegment:
         self.timestamps = sorted(index_df["key.frame_timestamp_micros"].unique())
 
     def __getitem__(self, idx) -> Frame:
+        """Return the parsed Frame at the given index."""
         timestamp = self.timestamps[idx]
         if self.cameras:
             camera_images_df = self.store.load_camera_images(
@@ -124,8 +132,10 @@ class WaymoSegment:
         return frame
 
     def __len__(self) -> int:
+        """Return the number of frames in the segment."""
         return len(self.timestamps)
 
     def __iter__(self):
+        """Iterate over parsed frames in the segment."""
         for idx in range(len(self)):
             yield self[idx]

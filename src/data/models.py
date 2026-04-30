@@ -1,3 +1,5 @@
+"""Data models used by the Waymo data loader and parser."""
+
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -7,6 +9,8 @@ from .enums import Camera, ClassID, Lidar
 
 @dataclass
 class Box2D:
+    """2D bounding box in image coordinates."""
+
     center_x: float
     center_y: float
     width: float
@@ -15,6 +19,8 @@ class Box2D:
 
 @dataclass
 class Box3D:
+    """3D bounding box in the vehicle coordinate frame."""
+
     center_x: float
     center_y: float
     center_z: float
@@ -26,6 +32,8 @@ class Box3D:
 
 @dataclass
 class CameraLabel:
+    """Annotated object label in camera image space."""
+
     object_id: int
     box_2d: Box2D
     class_id: ClassID
@@ -33,6 +41,8 @@ class CameraLabel:
 
 @dataclass
 class LidarLabel:
+    """Annotated object label in LiDAR space."""
+
     object_id: int
     box_3d: Box3D
     class_id: ClassID
@@ -42,6 +52,8 @@ class LidarLabel:
 
 @dataclass
 class CameraImage:
+    """Loaded camera image and associated metadata."""
+
     camera_name: Camera
     timestamp_micros: int
     image: np.ndarray
@@ -49,6 +61,8 @@ class CameraImage:
 
 @dataclass
 class LidarRangeImage:
+    """Loaded LiDAR range image representation."""
+
     lidar_name: Lidar
     timestamp_micros: int
     range_image: np.ndarray  # HxWx4 [range, intensity, elongation, no_label_zone]
@@ -57,6 +71,8 @@ class LidarRangeImage:
 
 @dataclass
 class LidarPointCloud:
+    """Point cloud converted from a LiDAR range image."""
+
     lidar_name: Lidar
     timestamp_micros: int
     point_cloud: np.ndarray  # Nx4 [x, y, z, intensity]
@@ -65,6 +81,8 @@ class LidarPointCloud:
 
 @dataclass
 class CameraIntrinsicsPinhole:
+    """Pinhole camera intrinsics used for image projection."""
+
     # u = focal_length_u * x / z + principal_point_u
     # v = focal_length_v * y / z + principal_point_v
     width: int
@@ -77,6 +95,8 @@ class CameraIntrinsicsPinhole:
 
 @dataclass
 class CameraIntrinsicsBrownConrady:
+    """Brown–Conrady camera intrinsics model for distortion-aware projection."""
+
     # 1. x_n = x / z, y_n = y / z
     # 2. r^2 = x_n^2 + y_n^2
     # 3. x_d = x_r * (1 + k1*r^2 + k2*r^4 + k3*r^6), y_d = y_n * (1 + k1*r^2 + k2*r^4 + k3*r^6)  # radial distortion
@@ -97,6 +117,8 @@ class CameraIntrinsicsBrownConrady:
 
 @dataclass
 class CameraCalibration:
+    """Camera calibration parameters including intrinsics and extrinsics."""
+
     camera_name: Camera
     intrinsic_matrix: CameraIntrinsicsPinhole | CameraIntrinsicsBrownConrady
     extrinsic_matrix: np.ndarray  # 4x4
@@ -104,6 +126,8 @@ class CameraCalibration:
 
 @dataclass
 class LidarCalibration:
+    """LiDAR calibration parameters including beam inclinations and extrinsics."""
+
     lidar_name: Lidar
     extrinsic_matrix: np.ndarray  # 4x4 lidar_frame_to_vehicle_frame
     beam_inclination_min: float
@@ -113,6 +137,8 @@ class LidarCalibration:
 
 @dataclass
 class SensorRig:
+    """Sensor rig definition for a dataset segment."""
+
     # segment-level set of sensors
     cameras: dict[Camera, CameraCalibration] = field(default_factory=dict)
     lidars: dict[Lidar, LidarCalibration] = field(default_factory=dict)
@@ -120,6 +146,8 @@ class SensorRig:
 
 @dataclass
 class Frame:
+    """Parsed frame payload containing camera and LiDAR observations."""
+
     timestamp_micros: int
     camera_images: dict[Camera, CameraImage] = field(default_factory=dict)
     lidar_range_images: dict[Lidar, list[LidarRangeImage]] = field(

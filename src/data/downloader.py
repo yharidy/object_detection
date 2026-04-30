@@ -60,6 +60,7 @@ def get_client():
     """
 
     def setup_client():
+        """Create and return a Google Cloud Storage client for the current thread."""
         try:
             client = storage.Client()
             return client

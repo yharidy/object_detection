@@ -22,6 +22,12 @@ class WaymoDatasetV2Store:
     """
 
     def __init__(self, root_dir: Path, segment_name: str):
+        """Create a new WaymoDatasetV2Store for a given segment.
+
+        Args:
+            root_dir: Root directory containing the Parquet dataset components.
+            segment_name: Name of the segment file or segment base name.
+        """
         logger.info(
             f"Initializing WaymoDatasetV2Store for segment '{segment_name}' at '{root_dir}'"
         )
@@ -39,6 +45,17 @@ class WaymoDatasetV2Store:
         filters: list | None = None,
         as_pandas: bool = True,
     ) -> pd.DataFrame | pa.Table:
+        """Load a component table from disk and return it as pandas or pyarrow.
+
+        Args:
+            component: Component folder name (e.g. camera_image, lidar, camera_calibration).
+            columns: Optional column subset to read.
+            filters: Optional pyarrow-compatible filters to apply.
+            as_pandas: Whether to return a pandas DataFrame.
+
+        Returns:
+            A pandas DataFrame or pyarrow Table for the requested component.
+        """
         component_path = self.root_dir / component / self.segment_name
         table = pq.read_table(component_path, columns=columns, filters=filters)
         return table.to_pandas() if as_pandas else table

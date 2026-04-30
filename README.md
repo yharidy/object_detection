@@ -50,6 +50,8 @@ pip install -r requirements.txt
 
 The WAYMO dataset should be placed in the `data/raw/` directory. Follow WAYMO's instructions for downloading and organizing the data.
 
+For a detailed overview of the data-loading architecture, see `DATA_LOADING.md`.
+
 ## Quick Start
 
 ```python

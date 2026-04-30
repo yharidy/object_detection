@@ -1,3 +1,5 @@
+"""Rerun visualization helper for Waymo dataset frames."""
+
 import time
 
 import cv2
@@ -12,11 +14,15 @@ logger = get_logger(__name__)
 
 
 class WaymoRerunVisualizer:
+    """Visualize Waymo frames in Rerun with cameras, LiDAR, and labels."""
+
     def __init__(self, app_name: str = "waymo_rerun_visualizer"):
+        """Initialize the Rerun visualizer application."""
         rr.init(app_name, spawn=False)
         self._transforms_logged = False
 
     def setup(self, sensor_rig: SensorRig):
+        """Start the Rerun server and log the static sensor transforms."""
         rr.serve_web(open_browser=False)
         logger.info(
             "Run 'rerun+http://localhost:9876/proxy' to view the visualization in Rerun."
@@ -26,6 +32,7 @@ class WaymoRerunVisualizer:
         self._transforms_logged = True
 
     def log_frame(self, frame_idx: int, frame: Frame):
+        """Log a single frame's camera images, LiDAR data, and labels to Rerun."""
         assert (
             self._transforms_logged
         ), "Call setup() with the sensor rig before logging frames."
@@ -42,6 +49,7 @@ class WaymoRerunVisualizer:
     def _extrinsic_to_transform3d(
         self, extrinsic_matrix, offset_deg: list[float] | None = None
     ):
+        """Convert a 4x4 extrinsic matrix into a Rerun Transform3D object."""
         rotation = np.array(extrinsic_matrix[:3, :3], dtype=float)
         rotation = R.from_matrix(rotation)
         if offset_deg is not None:
@@ -58,6 +66,7 @@ class WaymoRerunVisualizer:
         )
 
     def _camera_intrinsic_to_pinhole(self, intrinsic):
+        """Convert camera intrinsics into a Rerun Pinhole camera model."""
         return rr.Pinhole(
             resolution=(intrinsic.width, intrinsic.height),
             focal_length=(intrinsic.focal_length_u, intrinsic.focal_length_v),
@@ -65,6 +74,7 @@ class WaymoRerunVisualizer:
         )
 
     def _log_sensor_transforms(self, sensor_rig: SensorRig):
+        """Log the world, vehicle, camera, and lidar coordinate transforms."""
         rr.log(
             "world/vehicle",
             rr.Transform3D(
@@ -115,6 +125,7 @@ class WaymoRerunVisualizer:
             )
 
     def _log_camera_images(self, frame: Frame):
+        """Log camera images for the current frame."""
         for camera, camera_image in frame.camera_images.items():
             logger.debug(f"Logging camera image for camera: {camera.name}")
             rr.log(
@@ -123,6 +134,7 @@ class WaymoRerunVisualizer:
             )
 
     def _log_lidar_range_images(self, frame: Frame):
+        """Log LiDAR range images for each return in the frame."""
         for lidar, range_images in frame.lidar_range_images.items():
             logger.debug(f"Logging range images for LiDAR: {lidar.name}")
             for range_image in range_images:
@@ -140,6 +152,7 @@ class WaymoRerunVisualizer:
                 )
 
     def _log_lidar_point_clouds(self, frame: Frame):
+        """Log LiDAR point clouds with intensity colorization."""
         for lidar, point_clouds in frame.lidar_point_clouds.items():
             logger.debug(f"Logging point clouds for LiDAR: {lidar.name}")
             for point_cloud in point_clouds:
@@ -163,6 +176,7 @@ class WaymoRerunVisualizer:
                 )
 
     def _log_camera_labels(self, frame: Frame):
+        """Log 2D camera bounding boxes for the current frame."""
         for camera, camera_boxes in frame.camera_labels.items():
             if not camera_boxes:
                 continue
@@ -183,6 +197,7 @@ class WaymoRerunVisualizer:
             )
 
     def _log_lidar_labels(self, frame: Frame):
+        """Log 3D LiDAR bounding boxes for the current frame."""
         if not frame.lidar_labels:
             return
         logger.debug("Logging LiDAR bounding boxes.")
