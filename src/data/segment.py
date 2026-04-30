@@ -2,11 +2,13 @@
 
 from pathlib import Path
 
-from enums import Camera, Lidar
-from frame_parser import WaymoFrameParser
-from store import WaymoDatasetV2Store
+from ..utils.logging import get_logger
+from .enums import Camera, Lidar
+from .frame_parser import WaymoFrameParser
+from .models import Frame
+from .store import WaymoDatasetV2Store
 
-from models import Frame
+logger = get_logger(__name__)
 
 
 class WaymoSegment:
@@ -18,37 +20,112 @@ class WaymoSegment:
         root_dir: Path,
         cameras: list[Camera] | None,
         lidars: list[Lidar] | None,
+        load_point_clouds: bool = False,
+        lidar_returns: list[int] | None = None,
+        load_camera_labels: bool = False,
+        load_lidar_labels: bool = False,
     ):
+        """Initialize the WaymoSegment.
+
+        Args:
+            segment_name: Name of the segment to load.
+            root_dir: Root directory where the segment data is stored in Parquet format.
+            cameras: List of Camera enums to load.
+            lidars: List of Lidar enums to load.
+            load_point_clouds: Whether to load point clouds for the lidars. If True,
+                the point clouds will be converted from the range images using the provided calibrations.
+            lidar_returns: List of return indices to load for each lidar. If None, loads only the first return.
+        """
+        logger.info(
+            f"Initializing WaymoSegment with segment_name='{segment_name}', root_dir='{root_dir}', cameras={cameras}, lidars={lidars}, load_point_clouds={load_point_clouds}, lidar_returns={lidar_returns}"
+        )
         self.store = WaymoDatasetV2Store(root_dir=root_dir, segment_name=segment_name)
         self.parser = WaymoFrameParser()
         self.cameras = cameras
         self.lidars = lidars
+        self.load_point_clouds = load_point_clouds
+        self.lidar_returns = lidar_returns
+        self.load_camera_labels = load_camera_labels
+        self.load_lidar_labels = load_lidar_labels
+        if not self.cameras and not self.lidars:
+            raise ValueError("At least one camera or lidar must be specified.")
+        self._load()
 
-    def load(self):
+    def _load(self):
+        # called once during initialization to load sensor rig and frame timestamps
+        # load calibrations
+        camera_calib_df = (
+            self.store.load_camera_calibrations(self.cameras) if self.cameras else None
+        )
+        lidar_calib_df = (
+            self.store.load_lidar_calibrations(self.lidars) if self.lidars else None
+        )
+
         self.sensor_rig = self.parser.parse_sensor_rig(
-            camera_calibration_df=self.store.load_camera_calibrations(self.cameras),
-            lidar_calibration_df=self.store.load_lidar_calibrations(self.lidars),
+            camera_calibration_df=camera_calib_df,
+            lidar_calibration_df=lidar_calib_df,
         )
-        index_df = self.store.load_camera_images(
-            columns=["key.frame_timestamp_micros", "key.camera_name"]
-        )
+        # load frame timestamps
+        if self.cameras:
+            index_df = self.store.load_camera_images(
+                columns=["key.frame_timestamp_micros"],
+                cameras=[self.cameras[0]],  # use first camera timestamps for indexing
+            )
+
+        else:
+            index_df = self.store.load_lidar_data(
+                columns=["key.frame_timestamp_micros"],
+                lidars=[self.lidars[0]],  # use first lidar timestamps for indexing
+            )
         self.timestamps = sorted(index_df["key.frame_timestamp_micros"].unique())
 
-    def __get_item__(self, idx) -> Frame:
+    def __getitem__(self, idx) -> Frame:
         timestamp = self.timestamps[idx]
+        if self.cameras:
+            camera_images_df = self.store.load_camera_images(
+                cameras=self.cameras,
+                filters=[("key.frame_timestamp_micros", "==", timestamp)],
+            )
+        else:
+            camera_images_df = None
 
-        camera_images_df = self.store.load_camera_images(
-            cameras=self.cameras,
-            filters=[("key.frame_timestamp_micros", "==", timestamp)],
-        )
-        lidar_data_df = self.store.load_lidar_data(
-            lidars=self.lidars,
-            filters=[("key.frame_timestamp_micros", "==", timestamp)],
-        )
+        if self.lidars:
+            lidar_data_df = self.store.load_lidar_data(
+                lidars=self.lidars,
+                filters=[("key.frame_timestamp_micros", "==", timestamp)],
+            )
+        else:
+            lidar_data_df = None
+
+        if self.cameras and self.load_camera_labels:
+            camera_labels_df = self.store.load_camera_bboxes(
+                cameras=self.cameras,
+                filters=[("key.frame_timestamp_micros", "==", timestamp)],
+            )
+        else:
+            camera_labels_df = None
+        if self.lidars and self.load_lidar_labels:
+            lidar_labels_df = self.store.load_lidar_bboxes(
+                filters=[("key.frame_timestamp_micros", "==", timestamp)],
+            )
+        else:
+            lidar_labels_df = None
+
         frame = self.parser.parse_frame(
             timestamp_micros=timestamp,
             camera_images_df=camera_images_df,
-            lidar_data_df=lidar_data_df,
-            sensor_rig=self.sensor_rig,
+            lidar_range_images_df=lidar_data_df,
+            lidar_calibrations=self.sensor_rig.lidars,
+            lidar_returns=self.lidar_returns,
+            load_point_clouds=self.load_point_clouds,
+            camera_labels_df=camera_labels_df,
+            lidar_labels_df=lidar_labels_df,
         )
         return frame
+
+    def __len__(self) -> int:
+        return len(self.timestamps)
+
+    def __iter__(self):
+        for idx in range(len(self)):
+            yield self[idx]

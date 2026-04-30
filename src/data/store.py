@@ -5,7 +5,11 @@ from pathlib import Path
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from enums import Camera, Lidar
+
+from ..utils.logging import get_logger
+from .enums import Camera, Lidar
+
+logger = get_logger(__name__)
 
 
 class WaymoDatasetV2Store:
@@ -18,6 +22,9 @@ class WaymoDatasetV2Store:
     """
 
     def __init__(self, root_dir: Path, segment_name: str):
+        logger.info(
+            f"Initializing WaymoDatasetV2Store for segment '{segment_name}' at '{root_dir}'"
+        )
         self.root_dir = root_dir
         self.segment_name = (
             segment_name
@@ -31,7 +38,7 @@ class WaymoDatasetV2Store:
         columns: list[str] | None = None,
         filters: list | None = None,
         as_pandas: bool = True,
-    ) -> pd.DataFrame | pq.Table:
+    ) -> pd.DataFrame | pa.Table:
         component_path = self.root_dir / component / self.segment_name
         table = pq.read_table(component_path, columns=columns, filters=filters)
         return table.to_pandas() if as_pandas else table
@@ -40,7 +47,7 @@ class WaymoDatasetV2Store:
         self,
         cameras: list[Camera] | None = None,
         columns: list[str] | None = None,
-        filters: list | None = None,
+        filters: list[tuple] | None = None,
         as_pandas: bool = True,
     ) -> pd.DataFrame | pa.Table:
         """Load camera images for the segment.
@@ -53,11 +60,21 @@ class WaymoDatasetV2Store:
         Returns:
             A pandas DataFrame or pyarrow Table containing the camera images for the segment, filtered by the specified camera and other filters if provided.
         """
+        logger.debug(
+            f"Loading camera images for segment '{self.segment_name}' with filters: cameras={cameras}, columns={columns}, additional_filters={filters}"
+        )
         if cameras is not None:
-            filters = list(filters) if filters else []
-            filters.extend([("key.camera_name", "==", cam.value) for cam in cameras])
+            extra_tuples = filters or []
+            camera_filters = [
+                [("key.camera_name", "==", cam.value)] + extra_tuples for cam in cameras
+            ]
+        else:
+            camera_filters = [[f] for f in filters] if filters else []
         return self._load_component(
-            "camera_image", columns=columns, filters=filters, as_pandas=as_pandas
+            "camera_image",
+            columns=columns,
+            filters=camera_filters or None,
+            as_pandas=as_pandas,
         )
 
     def load_lidar_data(
@@ -77,19 +94,33 @@ class WaymoDatasetV2Store:
         Returns:
             A pandas DataFrame or pyarrow Table containing the LiDAR data for the segment, filtered by the specified LiDAR and other filters if provided.
         """
+        logger.debug(
+            f"Loading LiDAR data for segment '{self.segment_name}' with filters: lidars={lidars}, columns={columns}, additional_filters={filters}"
+        )
         if lidars is not None:
-            filters = list(filters) if filters else []
-            filters.extend([("key.laser_name", "==", lidar.value) for lidar in lidars])
+            extra_tuples = filters or []
+            lidar_filters = [
+                [("key.laser_name", "==", lidar.value)] + extra_tuples
+                for lidar in lidars
+            ]
+        else:
+            lidar_filters = [[f] for f in filters] if filters else []
         return self._load_component(
-            "lidar", columns=columns, filters=filters, as_pandas=as_pandas
+            "lidar", columns=columns, filters=lidar_filters or None, as_pandas=as_pandas
         )
 
     def load_camera_calibrations(
         self, cameras: list[Camera] | None = None
     ) -> pd.DataFrame:
         """Load camera calibrations for the segment, optionally filtered by camera."""
-        if cameras:
-            filters = [("key.camera_name", "==", cam.value) for cam in cameras]
+        logger.debug(
+            f"Loading camera calibrations for segment '{self.segment_name}' with filters: cameras={cameras}"
+        )
+        filters = (
+            [[("key.camera_name", "==", cam.value)] for cam in cameras]
+            if cameras
+            else None
+        )
         return self._load_component(
             "camera_calibration", filters=filters, as_pandas=True
         )
@@ -98,20 +129,43 @@ class WaymoDatasetV2Store:
         self, lidars: list[Lidar] | None = None
     ) -> pd.DataFrame:
         """Load LiDAR calibrations for the segment, optionally filtered by LiDAR."""
-        if lidars:
-            filters = [("key.laser_name", "==", lidar.value) for lidar in lidars]
+        logger.debug(
+            f"Loading LiDAR calibrations for segment '{self.segment_name}' with filters: lidars={lidars}"
+        )
+        filters = (
+            [[("key.laser_name", "==", lidar.value)] for lidar in lidars]
+            if lidars
+            else None
+        )
         return self._load_component(
             "lidar_calibration", filters=filters, as_pandas=True
         )
 
-    def load_camera_bboxes(self, camera: Camera | None = None) -> pd.DataFrame:
+    def load_camera_bboxes(
+        self, cameras: Camera | None = None, filters: list | None = None
+    ) -> pd.DataFrame:
         """Load camera bounding boxes for the segment, optionally filtered by camera."""
-        filters = (
-            [("key.camera_name", "==", camera.value)] if camera is not None else None
+        logger.debug(
+            f"Loading camera bounding boxes for segment '{self.segment_name}' with filters: camera={cameras}, additional_filters={filters}"
         )
-        return self._load_component("camera_box", filters=filters, as_pandas=True)
+        if cameras is not None:
+            extra_tuples = filters or []
+            camera_filters = [
+                [("key.camera_name", "==", cam.value)] + extra_tuples for cam in cameras
+            ]
+        else:
+            camera_filters = [[f] for f in filters] if filters else []
 
-    def load_lidar_bboxes(self, lidar: Lidar | None = None) -> pd.DataFrame:
+        return self._load_component(
+            "camera_box", filters=camera_filters, as_pandas=True
+        )
+
+    def load_lidar_bboxes(self, filters: list | None = None) -> pd.DataFrame:
         """Load LiDAR bounding boxes for the segment, optionally filtered by LiDAR."""
-        filters = [("key.laser_name", "==", lidar.value)] if lidar is not None else None
-        return self._load_component("lidar_box", filters=filters, as_pandas=True)
+        logger.debug(
+            f"Loading LiDAR bounding boxes for segment '{self.segment_name}' with additional_filters={filters}"
+        )
+
+        lidar_filters = [[f] for f in filters] if filters else []
+
+        return self._load_component("lidar_box", filters=lidar_filters, as_pandas=True)

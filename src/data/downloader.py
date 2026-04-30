@@ -17,10 +17,9 @@ from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import storage
 from tqdm import tqdm
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
-)
+from ..utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class DatasetSplit(Enum):
