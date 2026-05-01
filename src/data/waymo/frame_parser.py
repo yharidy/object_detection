@@ -2,9 +2,16 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from ..utils.logging import get_logger
-from .enums import Camera, Lidar
-from .models import (
+from src.data.waymo.enums import (
+    WAYMO_TO_DOMAIN_CAMERA_MAP,
+    WAYMO_TO_DOMAIN_CLASS_MAP,
+    WAYMO_TO_DOMAIN_LIDAR_MAP,
+    ClassID,
+    WaymoCamera,
+    WaymoLidar,
+)
+from src.data.waymo.lidar_transforms import range_image_to_point_cloud
+from src.domain import (
     Box2D,
     Box3D,
     CameraCalibration,
@@ -12,15 +19,16 @@ from .models import (
     CameraIntrinsicsBrownConrady,
     CameraIntrinsicsPinhole,
     CameraLabel,
-    ClassID,
+    CameraPosition,
     Frame,
     LidarCalibration,
     LidarLabel,
     LidarPointCloud,
+    LidarPosition,
     LidarRangeImage,
     SensorRig,
 )
-from .transforms import range_image_to_point_cloud
+from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -33,7 +41,7 @@ class WaymoFrameParser:
         timestamp_micros: int,
         camera_images_df: pd.DataFrame | None,
         lidar_range_images_df: pd.DataFrame | None,
-        lidar_calibrations: dict[Lidar, LidarCalibration] | None = None,
+        lidar_calibrations: dict[WaymoLidar, LidarCalibration] | None = None,
         lidar_returns: list[int] | None = None,
         load_point_clouds: bool = False,
         camera_labels_df: pd.DataFrame | None = None,
@@ -113,8 +121,10 @@ class WaymoFrameParser:
                 camera_name = row["key.camera_name"]
                 intrinsic_matrix = self._parse_camera_intrinsics(row)
                 extrinsic_matrix = self._parse_camera_extrinsics(row)
-                camera_calibrations[Camera(camera_name)] = CameraCalibration(
-                    camera_name=Camera(camera_name),
+                camera_calibrations[
+                    WAYMO_TO_DOMAIN_CAMERA_MAP[WaymoCamera(camera_name)]
+                ] = CameraCalibration(
+                    camera=WAYMO_TO_DOMAIN_CAMERA_MAP[WaymoCamera(camera_name)],
                     intrinsic_matrix=intrinsic_matrix,
                     extrinsic_matrix=extrinsic_matrix,
                 )
@@ -127,8 +137,10 @@ class WaymoFrameParser:
                     row
                 )
                 beam_inclinations = self._parse_lidar_beam_inclinations(row)
-                lidar_calibrations[Lidar(lidar_name)] = LidarCalibration(
-                    lidar_name=Lidar(lidar_name),
+                lidar_calibrations[
+                    WAYMO_TO_DOMAIN_LIDAR_MAP[WaymoLidar(lidar_name)]
+                ] = LidarCalibration(
+                    lidar=WAYMO_TO_DOMAIN_LIDAR_MAP[WaymoLidar(lidar_name)],
                     extrinsic_matrix=extrinsic_matrix,
                     beam_inclination_min=min_inclination,
                     beam_inclination_max=max_inclination,
@@ -139,14 +151,14 @@ class WaymoFrameParser:
 
     def parse_camera_images(
         self, camera_images_df: pd.DataFrame
-    ) -> dict[Camera, CameraImage]:
+    ) -> dict[CameraPosition, CameraImage]:
         """Parse camera images from the DataFrame.
 
         Args:
             camera_images_df: DataFrame containing camera image data.
 
         Returns:
-            A dictionary mapping Camera enum to CameraImage objects.
+            A dictionary mapping CameraPosition enum to CameraImage objects.
         """
         logger.debug("Parsing camera images")
         camera_images = {}
@@ -155,10 +167,12 @@ class WaymoFrameParser:
             timestamp_micros: int = row["key.frame_timestamp_micros"]
             image_data: bytes = row["[CameraImageComponent].image"]  # binary JPEG data
             decoded_image: np.ndarray = self._decode_jpeg(image_data)
-            camera_images[Camera(camera_name)] = CameraImage(
-                camera_name=Camera(camera_name),
-                timestamp_micros=timestamp_micros,
-                image=decoded_image,
+            camera_images[WAYMO_TO_DOMAIN_CAMERA_MAP[WaymoCamera(camera_name)]] = (
+                CameraImage(
+                    camera=WAYMO_TO_DOMAIN_CAMERA_MAP[WaymoCamera(camera_name)],
+                    timestamp_micros=timestamp_micros,
+                    image=decoded_image,
+                )
             )
         return camera_images
 
@@ -184,18 +198,19 @@ class WaymoFrameParser:
     def parse_lidar_data(
         self,
         lidar_range_images_df: pd.DataFrame,
-        lidar_calibrations: dict[Lidar, LidarCalibration] | None = None,
+        lidar_calibrations: dict[LidarPosition, LidarCalibration] | None = None,
         lidar_returns: list[int] | None = None,
         convert_to_point_cloud: bool = False,
     ) -> tuple[
-        dict[Lidar, list[LidarRangeImage]], dict[Lidar, list[LidarPointCloud]] | None
+        dict[LidarPosition, list[LidarRangeImage]],
+        dict[LidarPosition, list[LidarPointCloud]] | None,
     ]:
         """Parse lidar data from the DataFrame.
 
         Args:
             lidar_range_images_df: DataFrame containing lidar range image data.
             lidar_calibrations: Optional dictionary of lidar calibrations, required if convert_to_point_cloud is True.
-            returns: List of return counts to parse (e.g., [1, 2]). Defaults to [1].
+            returns: List of return counts to parse (e.g., [1, 2]).
             convert_to_point_cloud: Whether to convert range images to point clouds. Defaults to False.
 
         Returns:
@@ -212,7 +227,7 @@ class WaymoFrameParser:
         frame_range_images = {}
         frame_point_clouds = {}
         for _, row in lidar_range_images_df.iterrows():
-            lidar = Lidar(row["key.laser_name"])
+            lidar = WAYMO_TO_DOMAIN_LIDAR_MAP[WaymoLidar(row["key.laser_name"])]
             timestamp_micros: int = row["key.frame_timestamp_micros"]
             lidar_range_images = []
             lidar_point_clouds = []
@@ -223,7 +238,7 @@ class WaymoFrameParser:
                 )
                 lidar_range_images.append(
                     LidarRangeImage(
-                        lidar_name=lidar,
+                        lidar=lidar,
                         timestamp_micros=timestamp_micros,
                         range_image=range_image_1,
                         return_count=1,
@@ -239,7 +254,7 @@ class WaymoFrameParser:
                     )
                     lidar_point_clouds.append(
                         LidarPointCloud(
-                            lidar_name=lidar,
+                            lidar=lidar,
                             timestamp_micros=timestamp_micros,
                             point_cloud=point_cloud_1,
                             return_count=1,
@@ -252,7 +267,7 @@ class WaymoFrameParser:
                 )
                 lidar_range_images.append(
                     LidarRangeImage(
-                        lidar_name=lidar,
+                        lidar=lidar,
                         timestamp_micros=timestamp_micros,
                         range_image=range_image_2,
                         return_count=2,
@@ -267,7 +282,7 @@ class WaymoFrameParser:
                     )
                     lidar_point_clouds.append(
                         LidarPointCloud(
-                            lidar_name=lidar,
+                            lidar=lidar,
                             timestamp_micros=timestamp_micros,
                             point_cloud=point_cloud_2,
                             return_count=2,
@@ -429,7 +444,7 @@ class WaymoFrameParser:
 
     def parse_camera_labels(
         self, camera_labels_df: pd.DataFrame
-    ) -> dict[Camera, list[CameraLabel]]:
+    ) -> dict[CameraPosition, list[CameraLabel]]:
         """Parse camera labels from the DataFrame.
 
         Args:
@@ -438,13 +453,15 @@ class WaymoFrameParser:
         Returns:
             Dictionary mapping camera names to lists of camera labels.
         """
-        camera_labels: dict[Camera, list[CameraLabel]] = {}
+        camera_labels: dict[CameraPosition, list[CameraLabel]] = {}
         for _, row in camera_labels_df.iterrows():
-            camera_name = Camera(row["key.camera_name"])
-            camera_labels.setdefault(camera_name, []).append(
+            camera = WAYMO_TO_DOMAIN_CAMERA_MAP[WaymoCamera(row["key.camera_name"])]
+            camera_labels.setdefault(camera, []).append(
                 CameraLabel(
                     object_id=row["key.camera_object_id"],
-                    class_id=ClassID(row["[CameraBoxComponent].type"]),
+                    object_class=WAYMO_TO_DOMAIN_CLASS_MAP[
+                        ClassID(row["[CameraBoxComponent].type"])
+                    ],
                     box_2d=Box2D(
                         center_x=row["[CameraBoxComponent].box.center.x"],
                         center_y=row["[CameraBoxComponent].box.center.y"],
@@ -468,7 +485,9 @@ class WaymoFrameParser:
             lidar_labels.append(
                 LidarLabel(
                     object_id=row["key.laser_object_id"],
-                    class_id=ClassID(row["[LiDARBoxComponent].type"]),
+                    object_class=WAYMO_TO_DOMAIN_CLASS_MAP[
+                        ClassID(row["[LiDARBoxComponent].type"])
+                    ],
                     box_3d=Box3D(
                         center_x=row["[LiDARBoxComponent].box.center.x"],
                         center_y=row["[LiDARBoxComponent].box.center.y"],

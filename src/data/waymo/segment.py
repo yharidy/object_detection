@@ -2,11 +2,11 @@
 
 from pathlib import Path
 
-from ..utils.logging import get_logger
-from .enums import Camera, Lidar
-from .frame_parser import WaymoFrameParser
-from .models import Frame
-from .store import WaymoDatasetV2Store
+from src.data.waymo.enums import WaymoCamera, WaymoLidar
+from src.data.waymo.frame_parser import WaymoFrameParser
+from src.data.waymo.store import WaymoDatasetV2Store
+from src.domain.frame import Frame
+from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -23,8 +23,8 @@ class WaymoSegment:
         self,
         segment_name: str,
         root_dir: Path,
-        cameras: list[Camera] | None,
-        lidars: list[Lidar] | None,
+        cameras: list[WaymoCamera] | None,
+        lidars: list[WaymoLidar] | None,
         load_point_clouds: bool = False,
         lidar_returns: list[int] | None = None,
         load_camera_labels: bool = False,
@@ -44,7 +44,7 @@ class WaymoSegment:
             load_lidar_labels: Whether to load LiDAR bounding boxes for each frame.
         """
         logger.info(
-            f"Initializing WaymoSegment with segment_name='{segment_name}', root_dir='{root_dir}', cameras={cameras}, lidars={lidars}, load_point_clouds={load_point_clouds}, lidar_returns={lidar_returns}"
+            f"Initializing WaymoSegment with segment_name='{segment_name}', root_dir='{root_dir}', cameras={[camera.value for camera in cameras]}, lidars={[lidar.value for lidar in lidars]}, load_point_clouds={load_point_clouds}, lidar_returns={lidar_returns}"
         )
         self.store = WaymoDatasetV2Store(root_dir=root_dir, segment_name=segment_name)
         self.parser = WaymoFrameParser()

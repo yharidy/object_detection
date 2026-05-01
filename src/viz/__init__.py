@@ -2,6 +2,6 @@
 Visualization utilities
 """
 
-from .rerun_visualizer import WaymoRerunVisualizer
+from .rerun_visualizer import RerunVisualizer
 
-__all__ = ["WaymoRerunVisualizer"]
+__all__ = ["RerunVisualizer"]

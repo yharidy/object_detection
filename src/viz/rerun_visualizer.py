@@ -7,17 +7,29 @@ import numpy as np
 import rerun as rr
 from scipy.spatial.transform import Rotation as R
 
-from src.data.models import Frame, SensorRig
+from src.domain.calibration import SensorRig
+from src.domain.frame import Frame
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class WaymoRerunVisualizer:
-    """Visualize Waymo frames in Rerun with cameras, LiDAR, and labels."""
+class RerunVisualizer:
+    """Visualize frames in Rerun with cameras, LiDAR, and labels."""
 
-    def __init__(self, app_name: str = "waymo_rerun_visualizer"):
+    def __init__(
+        self,
+        vis_point_clouds: bool = False,
+        vis_range_images: bool = False,
+        vis_camera_labels: bool = False,
+        vis_lidar_labels: bool = False,
+        app_name: str = "waymo_rerun_visualizer",
+    ):
         """Initialize the Rerun visualizer application."""
+        self.vis_point_clouds = vis_point_clouds
+        self.vis_range_images = vis_range_images
+        self.vis_camera_labels = vis_camera_labels
+        self.vis_lidar_labels = vis_lidar_labels
         rr.init(app_name, spawn=False)
         self._transforms_logged = False
 
@@ -41,10 +53,14 @@ class WaymoRerunVisualizer:
             timestamp=np.datetime64(int(frame.timestamp_micros), "us"),
         )
         self._log_camera_images(frame)
-        self._log_lidar_range_images(frame)
-        self._log_lidar_point_clouds(frame)
-        self._log_camera_labels(frame)
-        self._log_lidar_labels(frame)
+        if self.vis_range_images:
+            self._log_lidar_range_images(frame)
+        if self.vis_point_clouds:
+            self._log_lidar_point_clouds(frame)
+        if self.vis_camera_labels:
+            self._log_camera_labels(frame)
+        if self.vis_lidar_labels:
+            self._log_lidar_labels(frame)
 
     def _extrinsic_to_transform3d(
         self, extrinsic_matrix, offset_deg: list[float] | None = None
@@ -185,7 +201,7 @@ class WaymoRerunVisualizer:
                 [[b.box_2d.center_x, b.box_2d.center_y] for b in camera_boxes]
             )
             sizes = np.array([[b.box_2d.width, b.box_2d.height] for b in camera_boxes])
-            class_ids = np.array([b.class_id.value for b in camera_boxes])
+            class_ids = np.array([b.object_class.value for b in camera_boxes])
 
             rr.log(
                 f"world/vehicle/camera/{camera.name.lower()}/boxes",
@@ -214,7 +230,7 @@ class WaymoRerunVisualizer:
                 for b in frame.lidar_labels
             ]
         )
-        class_ids = np.array([b.class_id.value for b in frame.lidar_labels])
+        class_ids = np.array([b.object_class.value for b in frame.lidar_labels])
         half_yaws = np.array([b.box_3d.heading for b in frame.lidar_labels]) / 2
 
         # xyzw order as plain numpy array

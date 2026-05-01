@@ -5,7 +5,6 @@ hosted on Google Cloud Storage. It supports downloading camera images, lidar dat
 calibrations, and ground truth labels for training, validation, and test splits.
 """
 
-import logging
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -17,7 +16,7 @@ from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import storage
 from tqdm import tqdm
 
-from ..utils.logging import get_logger
+from ..src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

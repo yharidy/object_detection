@@ -6,8 +6,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from ..utils.logging import get_logger
-from .enums import Camera, Lidar
+from src.data.waymo.enums import WaymoCamera, WaymoLidar
+from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -62,7 +62,7 @@ class WaymoDatasetV2Store:
 
     def load_camera_images(
         self,
-        cameras: list[Camera] | None = None,
+        cameras: list[WaymoCamera] | None = None,
         columns: list[str] | None = None,
         filters: list[tuple] | None = None,
         as_pandas: bool = True,
@@ -96,7 +96,7 @@ class WaymoDatasetV2Store:
 
     def load_lidar_data(
         self,
-        lidars: list[Lidar] | None = None,
+        lidars: list[WaymoLidar] | None = None,
         columns: list[str] | None = None,
         filters: list | None = None,
         as_pandas: bool = True,
@@ -127,7 +127,7 @@ class WaymoDatasetV2Store:
         )
 
     def load_camera_calibrations(
-        self, cameras: list[Camera] | None = None
+        self, cameras: list[WaymoCamera] | None = None
     ) -> pd.DataFrame:
         """Load camera calibrations for the segment, optionally filtered by camera."""
         logger.debug(
@@ -143,7 +143,7 @@ class WaymoDatasetV2Store:
         )
 
     def load_lidar_calibrations(
-        self, lidars: list[Lidar] | None = None
+        self, lidars: list[WaymoLidar] | None = None
     ) -> pd.DataFrame:
         """Load LiDAR calibrations for the segment, optionally filtered by LiDAR."""
         logger.debug(
@@ -159,7 +159,7 @@ class WaymoDatasetV2Store:
         )
 
     def load_camera_bboxes(
-        self, cameras: Camera | None = None, filters: list | None = None
+        self, cameras: list[WaymoCamera] | None = None, filters: list | None = None
     ) -> pd.DataFrame:
         """Load camera bounding boxes for the segment, optionally filtered by camera."""
         logger.debug(
