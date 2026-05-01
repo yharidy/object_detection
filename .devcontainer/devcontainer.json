@@ -16,6 +16,7 @@
         "ms-python.debugpy",
         "ms-tools-vscode.vs-kubernetes-tools",
         "charliermarsh.ruff",
+        "ms-python.black-formatter",
         "ms-vscode.makefile-tools",
         "Jupyter.jupyter",
         "Jupyter.jupyter-keymap",

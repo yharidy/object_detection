@@ -25,6 +25,7 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.egg-info
 MANIFEST
 
 # PyInstaller
@@ -127,9 +128,10 @@ dmypy.json
 .DS_Store
 
 # Data directories
-data/raw/
-data/processed/
-data/external/
+/data/
+/data/raw/
+/data/processed/
+/data/external/
 
 # Model checkpoints
 models/checkpoints/
