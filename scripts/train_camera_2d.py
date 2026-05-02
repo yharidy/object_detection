@@ -87,7 +87,7 @@ def log_predictions(model, batch, device, num_classes, step, score_threshold=0.5
 
 # --- config ---
 MODEL = "fasterrcnn_resnet50_fpn"
-DATA_ROOT = Path("/workspaces/object_detection/data/waymo/raw")
+DATA_ROOT = "/workspaces/object_detection/data/waymo/raw"
 BATCH_SIZE = 2
 NUM_WORKERS = 0
 TARGET_SIZE = (320, 320)

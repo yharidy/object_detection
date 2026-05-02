@@ -51,3 +51,6 @@ python-dotenv==1.0.0
 
 # Optional: for experiment tracking
 wandb==0.26.1
+
+universal-pathlib
+gcsfs

@@ -1,10 +1,10 @@
 """Module for loading data from a Waymo Open Dataset v2 segment stored in Parquet format."""
 
-from pathlib import Path
-
 import pandas as pd
 import pyarrow as pa
+import pyarrow.fs as pafs
 import pyarrow.parquet as pq
+from upath import UPath
 
 from src.sources.waymo.enums import WaymoCamera, WaymoLidar
 from src.utils.logging import get_logger
@@ -21,7 +21,7 @@ class WaymoDatasetV2Store:
     contains a Parquet file for each segment, named according to the segment name.
     """
 
-    def __init__(self, root_dir: Path, segment_name: str):
+    def __init__(self, root_dir: str, segment_name: str):
         """Create a new WaymoDatasetV2Store for a given segment.
 
         Args:
@@ -31,7 +31,7 @@ class WaymoDatasetV2Store:
         logger.info(
             f"Initializing WaymoDatasetV2Store for segment '{segment_name}' at '{root_dir}'"
         )
-        self.root_dir = root_dir
+        self.root_dir = UPath(root_dir)
         self.segment_name = (
             segment_name
             if segment_name.endswith(".parquet")
@@ -57,7 +57,19 @@ class WaymoDatasetV2Store:
             A pandas DataFrame or pyarrow Table for the requested component.
         """
         component_path = self.root_dir / component / self.segment_name
-        table = pq.read_table(component_path, columns=columns, filters=filters)
+        # detect filesystem from path
+        path_str = str(component_path)
+        if path_str.startswith("gs://"):
+            filesystem, path_str = pafs.FileSystem.from_uri(path_str)
+        else:
+            filesystem = None  # use local filesystem
+
+        table = pq.read_table(
+            path_str,
+            filesystem=filesystem,
+            columns=columns,
+            filters=filters,
+        )
         return table.to_pandas() if as_pandas else table
 
     def load_camera_images(
