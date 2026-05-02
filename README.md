@@ -94,7 +94,7 @@ See `requirements.txt` for complete dependency list.
 ## Development
 
 ### Running training
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/yharidy/object_detection/blob/06821613671c7541bbf329ff318fc8a56502216b/notebooks/train_camera_2d_detector_colab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/yharidy/object_detection/blob/main//notebooks/train_camera_2d_detector_colab.ipynb)
 
 
 ### Running Tests
