@@ -46,8 +46,8 @@ pyyaml==6.0.1
 python-dotenv==1.0.0
 
 # Optional: for model deployment and serving
-onnx==1.15.0
-onnxruntime==1.17.0
+# onnx==1.15.0
+# onnxruntime==1.17.0
 
 # Optional: for experiment tracking
 wandb==0.26.1
