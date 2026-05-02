@@ -92,7 +92,7 @@ def log_predictions(model, batch, device, num_classes, step, score_threshold=0.5
 # --- config ---
 MODEL = "fasterrcnn_resnet50_fpn"
 DATA_ROOT = os.getenv("DATA_ROOT", "/workspaces/object_detection/data/waymo/raw")
-N_SEGMENTS = os.getenv("N_SEGMENTS", -1)
+N_SEGMENTS = int(os.getenv("N_SEGMENTS", -1))
 if N_SEGMENTS == -1:
     logger.warning(
         "N_SEGMENTS is set to -1, which means all segments will be loaded. This may lead to long loading times and high memory usage."
