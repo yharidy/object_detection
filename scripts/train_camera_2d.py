@@ -94,6 +94,7 @@ TARGET_SIZE = (320, 320)
 NUM_EPOCHS = 2
 NUM_CLASSES = 5
 LEARNING_RATE = 1e-4
+N_SEGMENTS = -1  # set to -1 to use all segments, or a positive integer to limit
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 logger.info(f"Using device: {DEVICE}")
@@ -126,6 +127,7 @@ train_loaders = build_waymo_loaders(
     split="training",
     cameras=CAMERAS,
     load_camera_labels=True,
+    num_segments=N_SEGMENTS,
 )
 logger.info(f"Built {len(train_loaders)} segment loaders for training split.")
 

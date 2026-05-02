@@ -15,6 +15,7 @@ def build_waymo_loaders(
     split: str,
     cameras: list[CameraPosition] | None = None,
     load_camera_labels: bool = True,
+    num_segments: int = -1,
     **kwargs,
 ) -> dict[str, WaymoSegment]:
     """Factory function to build WaymoSegment loaders for a given split.
@@ -51,6 +52,9 @@ def build_waymo_loaders(
 
     logger.info(f"Scanning: {camera_image_dir}")
     logger.info(f"Found {len(segment_names)} segment files")
+
+    if num_segments > 0:
+        segment_names = segment_names[:num_segments]
 
     return {
         segment_name: WaymoSegment(
