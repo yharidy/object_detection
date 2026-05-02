@@ -1,7 +1,6 @@
-from pathlib import Path
+import os
 
 import torch
-import torchvision.ops as ops
 from torch.utils.data import DataLoader
 
 import wandb
@@ -20,18 +19,23 @@ logger = get_logger("train_camera_2d")
 
 
 def log_predictions(model, batch, device, num_classes, step, score_threshold=0.5):
-    """Run inference on one batch and log predictions vs ground truth to wandb."""
     model.eval()
     with torch.no_grad():
         images = [img.to(device) for img in batch["image"]]
         predictions = model(images)
 
+    # ImageNet stats — must match what you used in Camera2DTransform
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+
     wandb_images = []
     for i, (img_tensor, pred, gt_boxes, gt_labels) in enumerate(
         zip(images, predictions, batch["boxes"], batch["labels"])
     ):
-        # convert tensor back to HWC uint8 for display
-        img_np = (img_tensor.cpu().permute(1, 2, 0).numpy() * 255).astype("uint8")
+        # denormalize before display
+        img_display = img_tensor.cpu() * std + mean
+        img_display = (img_display.clamp(0, 1) * 255).byte()
+        img_np = img_display.permute(1, 2, 0).numpy()  # CHW → HWC
 
         # filter predictions by score
         keep = pred["scores"] > score_threshold
@@ -87,14 +91,21 @@ def log_predictions(model, batch, device, num_classes, step, score_threshold=0.5
 
 # --- config ---
 MODEL = "fasterrcnn_resnet50_fpn"
-DATA_ROOT = "/workspaces/object_detection/data/waymo/raw"
+DATA_ROOT = os.getenv("DATA_ROOT", "/workspaces/object_detection/data/waymo/raw")
+N_SEGMENTS = os.getenv("N_SEGMENTS", -1)
+if N_SEGMENTS == -1:
+    logger.warning(
+        "N_SEGMENTS is set to -1, which means all segments will be loaded. This may lead to long loading times and high memory usage."
+    )
+if N_SEGMENTS <= 0:
+    raise ValueError("N_SEGMENTS must be a positive integer or -1 for all segments.")
 BATCH_SIZE = 2
 NUM_WORKERS = 0
 TARGET_SIZE = (320, 320)
 NUM_EPOCHS = 2
 NUM_CLASSES = 5
 LEARNING_RATE = 1e-4
-N_SEGMENTS = -1  # set to -1 to use all segments, or a positive integer to limit
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 logger.info(f"Using device: {DEVICE}")
