@@ -3,6 +3,9 @@ from pathlib import Path
 from src.domain.enums import CameraPosition
 from src.sources.waymo.enums import DOMAIN_CAMERA_TO_WAYMO, WaymoCamera
 from src.sources.waymo.segment import WaymoSegment
+from src.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def build_waymo_loaders(
@@ -10,7 +13,7 @@ def build_waymo_loaders(
     split: str,
     cameras: list[CameraPosition] | None = None,
     load_camera_labels: bool = True,
-    **kwargs
+    **kwargs,
 ) -> dict[str, WaymoSegment]:
     """Factory function to build WaymoSegment loaders for a given split.
 
@@ -31,7 +34,11 @@ def build_waymo_loaders(
     cameras = [DOMAIN_CAMERA_TO_WAYMO[cam] for cam in cameras]
     split_dir = data_root / split
     # use one subfolder to get the list of segments, assuming all components have the same segment files
-    segment_files = (split_dir / "camera_image").glob("*.parquet")
+    camera_dir = split_dir / "camera_image"
+    logger.info(f"Scanning: {camera_dir}")
+    logger.info(f"Exists: {camera_dir.exists()}")
+    segment_files = camera_dir.glob("*.parquet")
+    logger.info(f"Found {len(list(segment_files))} segment files in {camera_dir}")
     segment_names = [f.stem for f in segment_files]
     return {
         segment_name: WaymoSegment(
@@ -39,7 +46,7 @@ def build_waymo_loaders(
             root_dir=split_dir,
             cameras=cameras,
             load_camera_labels=load_camera_labels,
-            **kwargs
+            **kwargs,
         )
         for segment_name in segment_names
     }
