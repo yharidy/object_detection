@@ -8,6 +8,13 @@ from src.sources.base import FrameLoader
 
 
 class BaseDataset(Dataset, ABC):
+    """Abstract base class for datasets that load frames from multiple sources.
+
+    This class provides a common interface for PyTorch datasets that need to load
+    and transform frames from various data sources. It handles indexing across
+    multiple segments and applies optional transformations.
+    """
+
     def __init__(self, loaders: dict[str, FrameLoader], transform: Callable = None):
         """Base dataset class for loading and transforming frames from multiple sources.
 

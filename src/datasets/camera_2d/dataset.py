@@ -14,6 +14,13 @@ logger = get_logger(__name__)
 
 
 class Camera2DDataset(BaseDataset):
+    """Dataset for 2D camera-based object detection tasks.
+
+    This dataset loads camera images and associated 2D bounding box labels
+    from multiple segments and cameras. It supports data augmentation via
+    transforms and handles missing camera views gracefully.
+    """
+
     def __init__(
         self,
         loaders: dict[str, FrameLoader],
