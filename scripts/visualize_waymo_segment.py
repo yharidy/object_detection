@@ -6,8 +6,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import click
 
-from src.data.waymo.enums import WaymoCamera, WaymoLidar
-from src.data.waymo.segment import WaymoSegment
+from src.sources.waymo.enums import WaymoCamera, WaymoLidar
+from src.sources.waymo.segment import WaymoSegment
 from src.utils.logging import get_logger, setup_logging
 from src.viz.rerun_visualizer import RerunVisualizer
 

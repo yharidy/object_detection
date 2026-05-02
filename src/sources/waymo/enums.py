@@ -23,6 +23,10 @@ WAYMO_TO_DOMAIN_CAMERA_MAP = {
     WaymoCamera.SIDE_RIGHT: CameraPosition.SIDE_RIGHT,
 }
 
+DOMAIN_CAMERA_TO_WAYMO: dict[CameraPosition, WaymoCamera] = {
+    v: k for k, v in WAYMO_TO_DOMAIN_CAMERA_MAP.items()
+}
+
 
 class WaymoLidar(Enum):
     """Lidar IDs in the Waymo Open Dataset."""
@@ -42,6 +46,10 @@ WAYMO_TO_DOMAIN_LIDAR_MAP = {
     WaymoLidar.REAR: LidarPosition.REAR,
 }
 
+DOMAIN_LIDAR_TP_WAYMO: dict[LidarPosition, WaymoLidar] = {
+    v: k for k, v in WAYMO_TO_DOMAIN_LIDAR_MAP.items()
+}
+
 
 class ClassID(Enum):
     """Object class IDs in the Waymo dataset."""
@@ -49,7 +57,8 @@ class ClassID(Enum):
     UNKNOWN = 0
     VEHICLE = 1
     PEDESTRIAN = 2
-    CYCLIST = 3
+    SIGN = 3
+    CYCLIST = 4
 
 
 WAYMO_TO_DOMAIN_CLASS_MAP = {
@@ -57,4 +66,9 @@ WAYMO_TO_DOMAIN_CLASS_MAP = {
     ClassID.VEHICLE: ObjectClass.VEHICLE,
     ClassID.PEDESTRIAN: ObjectClass.PEDESTRIAN,
     ClassID.CYCLIST: ObjectClass.CYCLIST,
+    ClassID.SIGN: ObjectClass.SIGN,
+}
+
+DOMAIN_TO_WAYMO_CLASS_MAP: dict[ObjectClass, ClassID] = {
+    v: k for k, v in WAYMO_TO_DOMAIN_CLASS_MAP.items()
 }
