@@ -152,7 +152,9 @@ class WaymoSegment(FrameLoader):
             yield self[idx]
 
     def load_frame(self, frame_idx):
+        """Load a frame by its index within the segment."""
         return self[frame_idx]
 
     def get_frame_count(self):
+        """Return the total number of frames in the segment."""
         return len(self)
