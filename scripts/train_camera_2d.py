@@ -97,7 +97,7 @@ if N_SEGMENTS == -1:
     logger.warning(
         "N_SEGMENTS is set to -1, which means all segments will be loaded. This may lead to long loading times and high memory usage."
     )
-if N_SEGMENTS <= 0:
+if N_SEGMENTS <= 0 and N_SEGMENTS!=-1:
     raise ValueError("N_SEGMENTS must be a positive integer or -1 for all segments.")
 BATCH_SIZE = 2
 NUM_WORKERS = 0
