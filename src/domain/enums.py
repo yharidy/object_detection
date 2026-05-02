@@ -27,4 +27,5 @@ class ObjectClass(Enum):
     UNKNOWN = 0
     VEHICLE = 1
     PEDESTRIAN = 2
-    CYCLIST = 3
+    SIGN = 3
+    CYCLIST = 4

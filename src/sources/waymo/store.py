@@ -6,7 +6,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from src.data.waymo.enums import WaymoCamera, WaymoLidar
+from src.sources.waymo.enums import WaymoCamera, WaymoLidar
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)

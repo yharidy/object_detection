@@ -2,15 +2,6 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from src.data.waymo.enums import (
-    WAYMO_TO_DOMAIN_CAMERA_MAP,
-    WAYMO_TO_DOMAIN_CLASS_MAP,
-    WAYMO_TO_DOMAIN_LIDAR_MAP,
-    ClassID,
-    WaymoCamera,
-    WaymoLidar,
-)
-from src.data.waymo.lidar_transforms import range_image_to_point_cloud
 from src.domain import (
     Box2D,
     Box3D,
@@ -28,6 +19,15 @@ from src.domain import (
     LidarRangeImage,
     SensorRig,
 )
+from src.sources.waymo.enums import (
+    WAYMO_TO_DOMAIN_CAMERA_MAP,
+    WAYMO_TO_DOMAIN_CLASS_MAP,
+    WAYMO_TO_DOMAIN_LIDAR_MAP,
+    ClassID,
+    WaymoCamera,
+    WaymoLidar,
+)
+from src.sources.waymo.lidar_transforms import range_image_to_point_cloud
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -68,11 +68,15 @@ class WaymoFrameParser:
             if camera_images_df is not None
             else {}
         )
-        lidar_range_images, lidar_point_clouds = self.parse_lidar_data(
-            lidar_range_images_df,
-            lidar_calibrations,
-            lidar_returns,
-            load_point_clouds,
+        lidar_range_images, lidar_point_clouds = (
+            self.parse_lidar_data(
+                lidar_range_images_df,
+                lidar_calibrations,
+                lidar_returns,
+                load_point_clouds,
+            )
+            if lidar_range_images_df is not None
+            else ({}, {})
         )
         camera_labels = (
             self.parse_camera_labels(camera_labels_df)
