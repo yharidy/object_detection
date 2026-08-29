@@ -8,7 +8,7 @@ from src.datasets.camera_2d.collate import camera_2d_collate_fn
 from src.datasets.camera_2d.dataset import Camera2DDataset
 from src.datasets.camera_2d.transforms import Camera2DTransform
 from src.domain.enums import CameraPosition
-from src.models.detector_2d import build_faster_rcnn
+from src.models.faster_rcnn import build_faster_rcnn
 from src.sources.waymo.enums import WaymoCamera
 from src.sources.waymo.factory import build_waymo_loaders
 from src.utils.box_utils import cxcywh_to_xyxy
@@ -237,7 +237,7 @@ for epoch in range(NUM_EPOCHS):
 
         # explicitly free memory
         del loss_dict, loss, images, targets
-        torch.cuda.empty_cache()  # no-op on CPU but good habit
+        torch.cuda.empty_cache()
     avg_loss = total_loss / len(train_loader)
     logger.info(f"Epoch {epoch+1} completed. Average Loss: {avg_loss:.4f}")
 wandb.finish()
