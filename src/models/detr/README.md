@@ -1,6 +1,6 @@
 # Deformable DETR
 
-This folder contains a focused, modular implementation of Deformable DETR for a portfolio project and learning codebase. The goal is to capture the main ideas of the architecture in a way that is readable, testable, and easy to extend.
+This folder contains a modular implementation of Deformable DETR for a portfolio project. This implementation is based on the paper: [Deformable DETR: Deformable Transformers for End-to-End Object Detection[https://arxiv.org/abs/2010.04159]]
 
 Deformable DETR is a transformer-based object detector that improves on the original DETR in two important ways:
 
@@ -143,7 +143,6 @@ This is what lets the attention layer know which spatial region belongs to each 
 
 ```text
 Level 1 tokens  | Level 2 tokens | Level 3 tokens | Level 4 tokens
-     \n          \n                 \n                       \n        [B, S, C]
 ```
 
 This is handled by `flatten_multi_scale_features` in `feature_utils.py`.
@@ -209,96 +208,5 @@ After decoder output, the model predicts:
 
 These are then converted into final detections.
 
-## What is implemented in this folder
 
-This folder focuses on the foundational pieces that are most educational and easiest to reason about:
-
-- `position_embedding.py`
-  - 2D sinusoidal positional embeddings
-- `backbone.py`
-  - a ResNet-style multi-scale feature extractor
-- `feature_utils.py`
-  - flattening and metadata generation for multi-scale features
-- `multi_scale_deformable_attention.py`
-  - deformable attention over multiple levels
-
-Those pieces are exactly the parts that make the architecture different from a standard transformer and are the most useful conceptual building blocks for learning the design.
-
-## File map
-
-```text
-src/models/detr/
-├── __init__.py
-├── README.md
-├── backbone.py
-├── feature_utils.py
-├── multi_scale_deformable_attention.py
-├── position_embedding.py
-└── ...
-```
-
-The package is intentionally split by responsibility so it is easier to understand and test each concept in isolation.
-
-## Why this structure is helpful
-
-A good portfolio project should not only work, but also be readable. Splitting the code by concept keeps the architecture understandable:
-
-- positional encoding is isolated
-- backbone logic is isolated
-- flattening utilities are isolated
-- attention is isolated
-- tests can target each piece independently
-
-This makes debugging much easier and helps explain the model in interviews and project walkthroughs.
-
-## Practical training flow
-
-A typical training pass looks like this:
-
-1. forward image through the CNN backbone
-2. produce multi-scale feature maps
-3. add positional encodings
-4. flatten each level into a token sequence
-5. pass flattened features into deformable attention
-6. decode object queries
-7. predict boxes and classes
-8. compute detection loss
-
-That is the full training lifecycle the architecture is designed around.
-
-## Important implementation notes
-
-A few details matter in Deformable DETR and are often the source of confusion:
-
-- feature maps from different levels are not all the same size
-- each query samples a small number of offsets per level
-- attention weights are normalized over the sampled points
-- the feature maps must be flattened and reconstructed carefully so that each level is sampled in the right spatial region
-- the query dimension and head dimension must stay consistent across the sampling process
-
-This implementation reflects those constraints directly.
-
-## Summary
-
-Deformable DETR is a more efficient and practical version of DETR for object detection. It keeps the transformer-based end-to-end detection philosophy while replacing dense global attention with sparse, learned sampling around reference points.
-
-The key idea is simple but powerful:
-
-- detect where each object query should look
-- sample only a few informative points around that location
-- aggregate them with attention weights
-- do this across multiple feature scales
-
-That is what makes the model both more efficient and more useful for real detection problems.
-
-## Suggested next reading
-
-For a deeper understanding, the most useful next topics are:
-
-- DETR vs. Deformable DETR
-- multi-head attention and head splitting
-- reference points and sampling offsets
-- bipartite matching loss in DETR
-- deformable attention from the original paper
-
-These are the next conceptual building blocks if you want to turn this codebase into a stronger portfolio-level object detection project.
+[def]: https://arxiv.org/abs/2010.04159

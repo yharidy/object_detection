@@ -101,3 +101,33 @@ def test_multi_scale_deformable_attention_works_with_multiple_queries():
 
     assert out.shape == (2, 3, 8)
     assert torch.isfinite(out).all()
+
+
+def test_multi_scale_deformable_attention_keeps_query_and_head_order_aligned():
+    attention = MultiScaleDeformableAttention(
+        hidden_dim=2,
+        num_heads=2,
+        num_levels=1,
+        num_points=1,
+    )
+    with torch.no_grad():
+        attention.sampling_offsets.weight.zero_()
+        attention.sampling_offsets.bias.zero_()
+        attention.attention_weights.weight.zero_()
+        attention.attention_weights.bias.zero_()
+        attention.value_proj.weight.copy_(torch.eye(2))
+        attention.value_proj.bias.zero_()
+        attention.output_proj.weight.copy_(torch.eye(2))
+        attention.output_proj.bias.zero_()
+
+    output = attention(
+        query=torch.zeros(1, 2, 2),
+        input_flatten=torch.tensor([[[1.0, 10.0]]]),
+        reference_points=torch.tensor([[[[0.5, 0.5]], [[0.5, 0.5]]]]),
+        spatial_shapes=torch.tensor([[1, 1]]),
+        level_start_index=torch.tensor([0]),
+        input_padding_mask=torch.zeros(1, 1, dtype=torch.bool),
+    )
+
+    expected = torch.tensor([[[1.0, 10.0], [1.0, 10.0]]])
+    assert torch.allclose(output, expected)
