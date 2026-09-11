@@ -7,7 +7,7 @@ from torch import nn
 
 
 class PositionEmbeddingSine(nn.Module):
-    """2D sine positional embeddings for feature maps."""
+    """Create sine/cosine positional embeddings for 2D feature maps."""
 
     def __init__(
         self,
@@ -16,6 +16,16 @@ class PositionEmbeddingSine(nn.Module):
         normalize: bool = True,
         scale: float | None = None,
     ) -> None:
+        """Initialize the positional-embedding frequency bands.
+
+        Args:
+            num_pos_features: Number of frequency features for each spatial
+                axis. The returned embedding has twice this many channels.
+            temperature: Temperature used to form the frequency wavelengths.
+            normalize: Whether to normalize cumulative x/y coordinates before
+                applying ``scale``.
+            scale: Coordinate scale in radians. Defaults to ``2 * pi``.
+        """
         super().__init__()
         if num_pos_features <= 0 or num_pos_features % 2 != 0:
             raise ValueError("num_pos_features must be a positive even integer")
@@ -40,7 +50,8 @@ class PositionEmbeddingSine(nn.Module):
                 positions.
 
         Returns:
-            Positional encoding with shape [B, 2 * num_pos_features, H, W].
+            Positional encoding with shape
+            ``[B, 2 * num_pos_features, H, W]``.
         """
         if tensor.dim() != 4:
             raise ValueError(f"Expected input tensor to be 4D, but got {tensor.dim()}D")

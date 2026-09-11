@@ -8,7 +8,7 @@ def flatten_multi_scale_features(
     positions: list[torch.Tensor],
     masks: list[torch.Tensor],
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Flatten a list of multi-scale feature maps into the format used by deformable attention.
+    """Flatten aligned feature levels into deformable-attention metadata.
 
     Args:
         features: List of feature maps with shape [B, C, H_i, W_i].
@@ -16,7 +16,10 @@ def flatten_multi_scale_features(
         masks: List of boolean masks with shape [B, H_i, W_i].
 
     Returns:
-        A tuple of (src_flatten, pos_flatten, mask_flatten, spatial_shapes, level_start_index).
+        A tuple ``(src_flatten, pos_flatten, mask_flatten, spatial_shapes,
+        level_start_index)`` with shapes ``[B, S, C]``, ``[B, S, C]``,
+        ``[B, S]``, ``[num_levels, 2]``, and ``[num_levels]`` respectively.
+        ``S`` is the sum of ``H_i * W_i`` across all levels.
     """
     for feat in features:
         if feat.dim() != 4:

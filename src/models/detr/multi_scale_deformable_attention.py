@@ -8,7 +8,7 @@ from torch import nn
 
 
 class MultiScaleDeformableAttention(nn.Module):
-    """Multi-scale deformable attention over a list of feature maps."""
+    """Sample and aggregate sparse locations from multiple feature levels."""
 
     def __init__(
         self,
@@ -17,6 +17,16 @@ class MultiScaleDeformableAttention(nn.Module):
         num_levels: int = 4,
         num_points: int = 4,
     ) -> None:
+        """Initialize projections for offsets, weights, values, and output.
+
+        Args:
+            hidden_dim: Model/channel dimension. Must be divisible by
+                ``num_heads``.
+            num_heads: Number of independent attention heads.
+            num_levels: Number of feature-map levels represented in
+                ``input_flatten``.
+            num_points: Number of sampling points per head and level.
+        """
         super().__init__()
         if hidden_dim <= 0:
             raise ValueError("hidden_dim must be positive")
@@ -46,6 +56,7 @@ class MultiScaleDeformableAttention(nn.Module):
         self._reset_parameters()
 
     def _reset_parameters(self) -> None:
+        """Initialize projections and radial sampling-offset biases."""
         nn.init.constant_(self.sampling_offsets.weight.data, 0.0)
         # Initialize sampling_offsets bias with angle-based grid
         thetas = torch.arange(self.num_heads, dtype=torch.float32) * (
@@ -78,7 +89,7 @@ class MultiScaleDeformableAttention(nn.Module):
         level_start_index: torch.Tensor,
         input_padding_mask: torch.Tensor,
     ) -> torch.Tensor:
-        """Compute multi-scale deformable attention.
+        """Compute multi-scale deformable attention with bilinear sampling.
 
         Args:
             query: Query tensor with shape [B, Lq, hidden_dim].
@@ -88,6 +99,7 @@ class MultiScaleDeformableAttention(nn.Module):
             spatial_shapes: Level-wise feature map sizes with shape [num_levels, 2].
             level_start_index: First index for each level in the flattened sequence.
             input_padding_mask: Mask for padded source tokens with shape [B, S].
+                ``True`` entries are zeroed before sampling.
 
         Returns:
             Attention output with shape [B, Lq, hidden_dim].

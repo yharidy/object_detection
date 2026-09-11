@@ -5,9 +5,7 @@ from .multi_scale_deformable_attention import MultiScaleDeformableAttention
 
 
 class DeformableTransformerDecoderLayer(nn.Module):
-    """
-    Deformable Transformer decoder layer consisting of a multi-scale deformable attention
-    module followed by a feed forward network.
+    """Run query self-attention, deformable cross-attention, and an FFN.
 
     Args:
         hidden_dim: The dimension of the hidden representations.
@@ -29,6 +27,17 @@ class DeformableTransformerDecoderLayer(nn.Module):
         dropout: float = 0.1,
         activation: str = "relu",
     ):
+        """Initialize the decoder attention and feed-forward sublayers.
+
+        Args:
+            hidden_dim: Transformer feature dimension.
+            num_heads: Number of self-attention and deformable-attention heads.
+            num_levels: Number of encoder feature levels.
+            num_points: Number of deformable samples per head and level.
+            ffn_dim: Hidden dimension of the feed-forward network.
+            dropout: Dropout probability used in residual branches.
+            activation: FFN activation, either ``"relu"`` or ``"gelu"``.
+        """
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
@@ -75,8 +84,7 @@ class DeformableTransformerDecoderLayer(nn.Module):
         level_start_index: torch.Tensor,
         input_padding_mask: torch.Tensor | None = None,
     ):
-        """
-        Forward pass of the Deformable Transformer decoder layer.
+        """Apply one decoder layer to object queries and encoder memory.
 
         Args:
             encoder_memory: The memory from the encoder of shape [B, S, C].
@@ -84,6 +92,8 @@ class DeformableTransformerDecoderLayer(nn.Module):
             reference_points: The reference points for the queries of shape [B, n_queries, n_levels, 2].
             spatial_shapes: The spatial shapes of the feature maps of shape [num_levels, 2].
             level_start_index: The start index of each feature map level of shape [num_levels].
+            input_padding_mask: Optional boolean mask for encoder memory with
+                shape ``[B, S]``.
 
         Returns:
             output: Tensor of shape [B, n_queries, C] after passing through the decoder layer.
@@ -124,14 +134,20 @@ class DeformableTransformerDecoderLayer(nn.Module):
 
 
 class DeformableTransformerDecoder(nn.Module):
-    """
-    Deformable Transformer decoder consisting of multiple layers of
-    DeformableTransformerDecoderLayer.
+    """Decode learned object queries into query features, boxes, and logits.
 
     Args:
         n_queries: The number of queries.
         query_dim: The dimension of the query embeddings.
-        num_layers: The number of decoder layers.
+        num_layers: The number of decoder layers and box-refinement heads.
+        num_heads: Number of attention heads.
+        num_levels: Number of encoder feature levels.
+        dropout: Dropout probability in decoder layers.
+        num_points: Number of deformable samples per head and level.
+        ffn_dim: Hidden dimension of each decoder FFN.
+        num_classes: Number of foreground classes. One additional output
+            class is reserved for no-object/background.
+        activation: Decoder FFN activation, either ``"relu"`` or ``"gelu"``.
     """
 
     def __init__(
@@ -147,6 +163,7 @@ class DeformableTransformerDecoder(nn.Module):
         num_classes: int = 91,
         activation: str = "relu",
     ):
+        """Initialize queries, reference-point projection, and prediction heads."""
         super().__init__()
         self.n_queries = n_queries
         self.query_dim = query_dim
@@ -179,10 +196,13 @@ class DeformableTransformerDecoder(nn.Module):
             self.box_refinements.append(nn.Linear(query_dim, 4))
 
         # classification head
-        self.classification_head = nn.Linear(query_dim, self.num_classes)
+        self.classification_head = nn.Linear(
+            query_dim, self.num_classes + 1
+        )  # +1 for the "no object" class
 
     @staticmethod
     def _inverse_sigmoid(x: torch.Tensor, eps: float = 1e-5) -> torch.Tensor:
+        """Map probabilities in ``[0, 1]`` to logits with clamping."""
         x = x.clamp(min=eps, max=1 - eps)
         return torch.log(x / (1 - x))
 
@@ -193,14 +213,19 @@ class DeformableTransformerDecoder(nn.Module):
         level_start_index: torch.Tensor,
         input_padding_mask: torch.Tensor | None = None,
     ):
-        """
-        Forward pass of the Deformable Transformer decoder.
+        """Iteratively decode queries and refine their reference points.
 
         Args:
             encoder_output: The output from the encoder of shape [B, S, C].
             spatial_shapes: The spatial shapes of the feature maps of shape [num_levels, 2].
             level_start_index: The start index of each feature map level of shape [num_levels].
             input_padding_mask: The padding mask for the encoder output of shape [B, S] or None.
+
+        Returns:
+            A tuple ``(queries, boxes, class_logits)``. Queries have shape
+            ``[B, num_queries, query_dim]``; boxes have normalized ``cxcywh``
+            coordinates with shape ``[B, num_queries, 4]``; and class logits
+            have shape ``[B, num_queries, num_classes + 1]``.
         """
         if input_padding_mask is None:
             input_padding_mask = torch.zeros(
@@ -239,9 +264,9 @@ class DeformableTransformerDecoder(nn.Module):
                 self._inverse_sigmoid(reference_points) + box_offsets[..., :2]
             ).sigmoid()  # [B, n_queries, n_levels, 2]
 
-        boxes = torch.cat(
-            (reference_points, box_offsets[..., 2:].sigmoid()), dim=-1
-        )[:, :, 0, :]  # [B, n_queries, 4]
+        boxes = torch.cat((reference_points, box_offsets[..., 2:].sigmoid()), dim=-1)[
+            :, :, 0, :
+        ]  # [B, n_queries, 4]
         class_logits = self.classification_head(queries)  # [B, n_queries, num_classes]
 
         return queries, boxes, class_logits

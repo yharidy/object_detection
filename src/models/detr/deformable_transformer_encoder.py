@@ -5,7 +5,7 @@ from .multi_scale_deformable_attention import MultiScaleDeformableAttention
 
 
 class DeformableTransformerEncoderLayer(nn.Module):
-    """A single layer of the Deformable Transformer encoder.
+    """One deformable self-attention plus feed-forward encoder layer.
 
     Args:
         hidden_dim: The number of expected features in the input.
@@ -15,8 +15,6 @@ class DeformableTransformerEncoderLayer(nn.Module):
         dropout: The dropout value.
         activation: The activation function of intermediate layer, relu or gelu.
 
-    Returns:
-        output: Tensor of shape [B, S, hidden_dim] after passing through the encoder layer.
     """
 
     def __init__(
@@ -29,6 +27,17 @@ class DeformableTransformerEncoderLayer(nn.Module):
         ffn_dim: int = 1024,
         activation: str = "relu",
     ):
+        """Initialize attention, normalization, dropout, and FFN modules.
+
+        Args:
+            hidden_dim: Transformer feature dimension.
+            num_heads: Number of deformable-attention heads.
+            num_levels: Number of multi-scale feature levels.
+            num_points: Number of samples per head and level.
+            dropout: Dropout probability used after attention and in the FFN.
+            ffn_dim: Hidden dimension of the feed-forward network.
+            activation: FFN activation, either ``"relu"`` or ``"gelu"``.
+        """
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
@@ -55,13 +64,15 @@ class DeformableTransformerEncoderLayer(nn.Module):
         self.norm_ffn = nn.LayerNorm(hidden_dim)
 
     def _get_reference_points(self, spatial_shapes: torch.Tensor) -> torch.Tensor:
-        """Generate reference points for the Deformable Transformer encoder.
+        """Generate normalized pixel-center references for every source token.
 
         Args:
-            spatial_shapes: Tensor containing the shape of each feature map level [num_levels, 2].
+            spatial_shapes: Integer tensor containing ``[H_i, W_i]`` for each
+                feature level, with shape ``[num_levels, 2]``.
 
         Returns:
-            reference_points: Tensor containing the reference points for all feature map levels [S, 2], where S is the total number of spatial locations across all levels.
+            Tensor with shape ``[S, 2]`` containing normalized ``(x, y)``
+            coordinates, where ``S = sum(H_i * W_i)``.
         """
         all_level_points = []
         for lvl, (H, W) in enumerate(spatial_shapes):
@@ -83,14 +94,18 @@ class DeformableTransformerEncoderLayer(nn.Module):
         level_start_index: torch.Tensor,
         input_padding_mask: torch.Tensor | None = None,
     ):
-        """Forward pass of the Deformable Transformer encoder layer.
+        """Apply deformable self-attention followed by the FFN.
 
         Args:
             input_flatten: Flattened source feature tensor [B, S, C].
             positional_encodings: Tensor containing the positional encodings [B, S, C].
-            spatial_shapes: Tensor containing the shape of each feature map level [num_levels, 2].
-            level_start_index: Tensor containing the start index of each feature map level [num_levels].
-            input_padding_mask: Tensor containing the padding mask [B, S] or None.
+            spatial_shapes: Tensor of level shapes ``[num_levels, 2]``.
+            level_start_index: Starting token index of each level, shape
+                ``[num_levels]``.
+            input_padding_mask: Optional boolean mask ``[B, S]``.
+
+        Returns:
+            Encoded source features with shape ``[B, S, hidden_dim]``.
         """
         if input_flatten.dim() != 3:
             raise ValueError("input_flatten must have shape [B, S, C]")
@@ -155,7 +170,7 @@ class DeformableTransformerEncoderLayer(nn.Module):
 
 
 class DeformableTransformerEncoder(nn.Module):
-    """Deformable Transformer Encoder consisting of multiple encoder layers.
+    """Stack multiple deformable transformer encoder layers.
 
     Args:
         hidden_dim: The number of expected features in the input.
@@ -163,7 +178,8 @@ class DeformableTransformerEncoder(nn.Module):
         num_levels: The number of feature levels.
         num_points: The number of sampling points per attention head.
         dropout: The dropout value.
-        activation: The activation function of intermediate layer, relu or gelu.
+        activation: Activation function used by each layer, ``"relu"`` or
+            ``"gelu"``.
     """
 
     def __init__(
@@ -177,6 +193,7 @@ class DeformableTransformerEncoder(nn.Module):
         activation: str = "relu",
         num_layers: int = 6,
     ):
+        """Construct the encoder layer stack."""
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
@@ -208,14 +225,17 @@ class DeformableTransformerEncoder(nn.Module):
         level_start_index: torch.Tensor,
         input_padding_mask: torch.Tensor | None = None,
     ):
-        """Forward pass of the Deformable Transformer encoder.
+        """Run every encoder layer over the flattened multi-scale features.
 
         Args:
             input_flatten: Flattened source feature tensor [B, S, C].
             positional_encodings: Flattened positional encodings [B, S, C].
-            spatial_shapes: Tensor containing the shape of each feature map level [num_levels, 2].
-            level_start_index: Tensor containing the start index of each feature map level [num_levels].
-            input_padding_mask: Tensor containing the padding mask [B, S] or None.
+            spatial_shapes: Tensor of level shapes ``[num_levels, 2]``.
+            level_start_index: Tensor of level start indices ``[num_levels]``.
+            input_padding_mask: Optional boolean mask ``[B, S]``.
+
+        Returns:
+            Encoder memory with shape ``[B, S, hidden_dim]``.
         """
         for layer in self.layers:
             input_flatten = layer(

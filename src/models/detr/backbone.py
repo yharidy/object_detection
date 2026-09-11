@@ -10,26 +10,41 @@ from .position_embedding import PositionEmbeddingSine
 
 
 class BackboneWithPositionEmbedding(nn.Module):
-    """ResNet18 backbone that exposes multi-scale feature maps and positional encodings."""
+    """Extract projected multi-scale ResNet-18 features and 2D positions.
 
-    def __init__(self, hidden_dim: int = 256, pretrained: bool = True) -> None:
+    The first ``num_levels`` ResNet stages are exposed. Each stage is projected
+    to ``hidden_dim`` channels, and its padding mask is downsampled to the
+    corresponding feature-map resolution.
+    """
+
+    def __init__(
+        self, hidden_dim: int = 256, pretrained: bool = True, num_levels: int = 4
+    ) -> None:
+        """Initialize the backbone and per-level input projections.
+
+        Args:
+            hidden_dim: Number of channels produced at every feature level.
+                Must be positive and even because it is also used by the
+                positional embedding.
+            pretrained: Whether to initialize ResNet-18 with torchvision's
+                default pretrained weights.
+            num_levels: Number of intermediate ResNet stages to expose. The
+                implementation provides projections for at most four stages.
+        """
         super().__init__()
         if hidden_dim <= 0 or hidden_dim % 2 != 0:
             raise ValueError("hidden_dim must be a positive even integer")
 
         self.hidden_dim = hidden_dim
         self.pretrained = pretrained
+        self.num_levels = num_levels
         self.backbone = resnet18(
             weights=ResNet18_Weights.DEFAULT if pretrained else None
         )
+        self.levels = {f"layer{i}": f"layer{i}" for i in range(1, num_levels + 1)}
         self.backbone_with_interm_layers = IntermediateLayerGetter(
             self.backbone,
-            return_layers={
-                "layer1": "layer1",
-                "layer2": "layer2",
-                "layer3": "layer3",
-                "layer4": "layer4",
-            },
+            return_layers=self.levels,
         )
         self.input_projections = nn.ModuleList(
             [
@@ -46,7 +61,7 @@ class BackboneWithPositionEmbedding(nn.Module):
     def forward(
         self, images: torch.Tensor, mask: torch.Tensor | None = None
     ) -> tuple[list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]]:
-        """Run the backbone and return multi-scale features, encodings, and masks.
+        """Run the backbone and return one tensor per feature level.
 
         Args:
             images: Input images with shape [B, C, H, W].
@@ -54,8 +69,9 @@ class BackboneWithPositionEmbedding(nn.Module):
                 pixels.
 
         Returns:
-            A tuple of (features, positional_encodings, masks), where each item is a
-            list of tensors for the ResNet stages.
+            A tuple ``(features, positional_encodings, masks)``. Each list has
+            ``num_levels`` tensors. Feature and positional tensors have shape
+            ``[B, hidden_dim, H_i, W_i]``; masks have shape ``[B, H_i, W_i]``.
         """
         if images.dim() != 4:
             raise ValueError(f"Expected images to be 4D, but got {images.dim()}D")
@@ -81,13 +97,13 @@ class BackboneWithPositionEmbedding(nn.Module):
         outputs = self.backbone_with_interm_layers(images)
         feature_maps = [
             self.input_projections[i](outputs[layer])
-            for i, layer in enumerate(["layer1", "layer2", "layer3", "layer4"])
+            for i, layer in enumerate(self.levels.keys())
         ]
         masks = [
             F.interpolate(
                 mask[:, None].float(), size=outputs[layer].shape[-2:], mode="nearest"
             ).to(torch.bool)[:, 0]
-            for layer in ["layer1", "layer2", "layer3", "layer4"]
+            for layer in self.levels
         ]
         positional_encodings = [
             self.position_embedding(feature_map, level_mask)

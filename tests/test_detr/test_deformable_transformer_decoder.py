@@ -56,7 +56,7 @@ def test_decoder_stack_returns_queries_boxes_and_class_logits():
 
     assert queries.shape == (2, 3, 8)
     assert boxes.shape == (2, 3, 4)
-    assert class_logits.shape == (2, 3, 91)
+    assert class_logits.shape == (2, 3, 92)
     assert (boxes >= 0).all()
     assert (boxes <= 1).all()
     assert torch.isfinite(queries).all()
