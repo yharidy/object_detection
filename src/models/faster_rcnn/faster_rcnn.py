@@ -8,15 +8,15 @@ from torchvision.models.detection.faster_rcnn import (
 
 
 def build_faster_rcnn(num_classes: int) -> nn.Module:
-    """Build a Faster R-CNN model with a ResNet-50 backbone for 2D object detection.
+    """Build a Faster R-CNN model with a ResNet-50 backbone for 2D detection.
 
     Args:
-        num_classes: The number of object classes (including background) that the model should predict.
+        num_classes: Number of object classes, including background.
+
     Returns:
-        An instance of torchvision's Faster R-CNN model configured for the specified number of classes.
+        A torchvision Faster R-CNN instance configured for the requested class count.
     """
     model = fasterrcnn_resnet50_fpn(weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT)
-    # replace the classifier head for our number of classes
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
     return model
