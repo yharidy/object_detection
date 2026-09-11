@@ -16,6 +16,7 @@ class MultiScaleDeformableAttention(nn.Module):
         num_heads: int = 8,
         num_levels: int = 4,
         num_points: int = 4,
+        query_chunk_size: int = 256,
     ) -> None:
         """Initialize projections for offsets, weights, values, and output.
 
@@ -26,6 +27,9 @@ class MultiScaleDeformableAttention(nn.Module):
             num_levels: Number of feature-map levels represented in
                 ``input_flatten``.
             num_points: Number of sampling points per head and level.
+            query_chunk_size: Maximum number of queries processed together
+                during bilinear sampling. Smaller values reduce peak memory
+                usage, especially for encoder self-attention.
         """
         super().__init__()
         if hidden_dim <= 0:
@@ -38,11 +42,14 @@ class MultiScaleDeformableAttention(nn.Module):
             raise ValueError("num_levels must be positive")
         if num_points <= 0:
             raise ValueError("num_points must be positive")
+        if query_chunk_size <= 0:
+            raise ValueError("query_chunk_size must be positive")
 
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
         self.num_levels = num_levels
         self.num_points = num_points
+        self.query_chunk_size = query_chunk_size
         self.head_dim = hidden_dim // num_heads
 
         self.sampling_offsets = nn.Linear(
@@ -197,9 +204,9 @@ class MultiScaleDeformableAttention(nn.Module):
                 "sampling_locations and query must have the same number of sampling points"
             )
 
-        # Each feature level was flattened earlier. This loop restores one level
-        # at a time to an image-like [batch, channel, height, width] tensor because
-        # grid_sample operates on spatial feature maps, not token sequences.
+        # Each feature level was flattened earlier. Restore one level at a time
+        # to an image-like feature map because grid_sample operates on spatial
+        # tensors. Process queries in chunks to bound peak memory usage.
         level_outputs: list[torch.Tensor] = []
         for lvl, (height, width) in enumerate(spatial_shapes):
             start_idx = level_start_index[lvl]
@@ -217,54 +224,73 @@ class MultiScaleDeformableAttention(nn.Module):
             feat = feat.reshape(
                 batch_size, self.num_heads, self.head_dim, height, width
             )
-            # Keep this level's locations and merge batch, query, and head so one
-            # grid row corresponds to one (image, query, head) combination:
-            # [B, queries, heads, points, xy] -> [B*queries*heads, points, xy].
-            loc = sampling_locations[:, :, :, lvl, :, :]
-            loc = loc.reshape(
-                batch_size * num_queries * self.num_heads, self.num_points, 2
-            )
+            chunk_outputs: list[torch.Tensor] = []
+            for query_start in range(0, num_queries, self.query_chunk_size):
+                query_end = min(query_start + self.query_chunk_size, num_queries)
+                chunk_queries = query_end - query_start
 
-            grid_x = 2.0 * loc[..., 0] - 1.0
-            grid_y = 2.0 * loc[..., 1] - 1.0
-            # grid_sample expects normalized coordinates in [-1, 1], not [0, 1].
-            # The singleton dimension is the output height; points become its
-            # output width, giving [B*queries*heads, 1, points, 2].
-            grid = torch.stack((grid_x, grid_y), dim=-1)[:, None, :, :]
+                loc = sampling_locations[:, query_start:query_end, :, lvl, :, :]
+                # [B, chunk_queries, heads, points, 2]
+                # Convert normalized coordinates to pixel coordinates using
+                # the same convention as grid_sample(align_corners=False),
+                # then gather the four bilinear neighbors directly. This
+                # avoids repeating [B, heads, D, H, W] for every query.
+                pixel_x = loc[..., 0] * width - 0.5
+                pixel_y = loc[..., 1] * height - 0.5
+                x0 = pixel_x.floor().long()
+                y0 = pixel_y.floor().long()
+                x1 = x0 + 1
+                y1 = y0 + 1
+                wx = pixel_x - x0
+                wy = pixel_y - y0
 
-            # Repeat each head feature map for every query. Permute to [B, query,
-            # head, ...] so this order matches the flattened sampling locations.
-            feat = feat.unsqueeze(2).expand(
-                batch_size, self.num_heads, num_queries, self.head_dim, height, width
-            )
-            feat = feat.permute(0, 2, 1, 3, 4, 5)
-            feat = feat.reshape(
-                batch_size * num_queries * self.num_heads, self.head_dim, height, width
-            )
+                flat_feat = feat.reshape(
+                    batch_size, self.num_heads, self.head_dim, height * width
+                )
 
-            sampled_feat = F.grid_sample(
-                feat,
-                grid,
-                mode="bilinear",
-                padding_mode="zeros",
-                align_corners=False,
-            )
-            # grid_sample returns [combined, head_dim, 1, points]. Remove the
-            # artificial height and put points before channels:
-            # [combined, D, 1, points] -> [combined, points, D].
-            sampled_feat = sampled_feat.squeeze(2).permute(0, 2, 1)
-            # Restore semantic axes for weighted aggregation:
-            # [B*queries*heads, points, D] -> [B, queries, heads, points, D].
-            sampled_feat = sampled_feat.reshape(
-                batch_size, num_queries, self.num_heads, self.num_points, self.head_dim
-            )
+                def gather(y_index, x_index):
+                    valid = (
+                        (x_index >= 0)
+                        & (x_index < width)
+                        & (y_index >= 0)
+                        & (y_index < height)
+                    )
+                    index = y_index.clamp(0, height - 1) * width + x_index.clamp(
+                        0, width - 1
+                    )
+                    index = (
+                        index.permute(0, 2, 1, 3)
+                        .reshape(batch_size, self.num_heads, 1, -1)
+                        .expand(-1, self.num_heads, self.head_dim, -1)
+                    )
+                    value = flat_feat.gather(-1, index).reshape(
+                        batch_size,
+                        self.num_heads,
+                        self.head_dim,
+                        chunk_queries,
+                        self.num_points,
+                    )
+                    return value * valid.permute(0, 2, 1, 3)[:, :, None, :, :]
 
-            level_weights = weights[:, :, :, lvl, :]
-            # Broadcast each scalar point weight across its head dimension, then
-            # sum the sampled points to get one vector per head.
-            weighted = sampled_feat * level_weights.unsqueeze(-1)
-            out_level = weighted.sum(dim=3)
-            level_outputs.append(out_level)
+                top_left = gather(y0, x0)
+                top_right = gather(y0, x1)
+                bottom_left = gather(y1, x0)
+                bottom_right = gather(y1, x1)
+                wx = wx.permute(0, 2, 1, 3)[:, :, None, :, :]
+                wy = wy.permute(0, 2, 1, 3)[:, :, None, :, :]
+                sampled_feat = (
+                    top_left * (1 - wx) * (1 - wy)
+                    + top_right * wx * (1 - wy)
+                    + bottom_left * (1 - wx) * wy
+                    + bottom_right * wx * wy
+                )
+                sampled_feat = sampled_feat.permute(0, 3, 1, 4, 2)
+
+                level_weights = weights[:, query_start:query_end, :, lvl, :]
+                weighted = sampled_feat * level_weights.unsqueeze(-1)
+                chunk_outputs.append(weighted.sum(dim=3))
+
+            level_outputs.append(torch.cat(chunk_outputs, dim=1))
 
         # Every level now has [B, queries, heads, head_dim]. Sum levels, then
         # merge heads back into the model dimension [heads, head_dim] -> C.
