@@ -1,5 +1,9 @@
-"""
-Utility functions
-"""
+"""Utility functions for data, boxes, logging, and evaluation."""
 
-__all__ = []
+from .metrics import DetectionRecord, compute_detection_metrics, evaluate_detr_model
+
+__all__ = [
+    "DetectionRecord",
+    "compute_detection_metrics",
+    "evaluate_detr_model",
+]

@@ -60,10 +60,10 @@ from src.models import ObjectDetector
 from src.data import WAYMDataLoader
 
 # Initialize data loader
-train_loader = WAYMDataLoader.get_loader('data/raw', split='train')
+train_loader = WAYMDataLoader.get_loader("data/raw", split="train")
 
 # Initialize model
-model = ObjectDetector(model_type='yolov8')  # or custom model
+model = ObjectDetector(model_type="yolov8")  # or custom model
 
 # Training loop (to be implemented)
 ```
@@ -94,7 +94,7 @@ See `requirements.txt` for complete dependency list.
 ## Development
 
 ### Running training
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/yharidy/object_detection/blob/main//notebooks/train_camera_2d_detector_colab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/yharidy/object_detection/blob/main/notebooks/train_deformable_detr_checkpointed_colab.ipynb)
 
 
 ### Running Tests
