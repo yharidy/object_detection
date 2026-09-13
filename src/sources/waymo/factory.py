@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import gcsfs
@@ -8,6 +9,16 @@ from src.sources.waymo.segment import WaymoSegment
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _build_one(segment_name, data_root, split, cameras, load_camera_labels, kwargs):
+    return segment_name, WaymoSegment(
+        segment_name=segment_name,
+        root_dir=f"{data_root}/{split}",
+        cameras=cameras,
+        load_camera_labels=load_camera_labels,
+        **kwargs,
+    )
 
 
 def build_waymo_loaders(
@@ -56,13 +67,15 @@ def build_waymo_loaders(
     if num_segments > 0:
         segment_names = segment_names[:num_segments]
 
-    return {
-        segment_name: WaymoSegment(
-            segment_name=segment_name,
-            root_dir=f"{data_root}/{split}",
-            cameras=cameras,
-            load_camera_labels=load_camera_labels,
-            **kwargs,
-        )
-        for segment_name in segment_names
-    }
+    loaders = {}
+    with ThreadPoolExecutor(max_workers=32) as executor:
+        futures = [
+            executor.submit(
+                _build_one, name, data_root, split, cameras, load_camera_labels, kwargs
+            )
+            for name in segment_names
+        ]
+        for future in as_completed(futures):
+            name, segment = future.result()
+            loaders[name] = segment
+    return loaders

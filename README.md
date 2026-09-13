@@ -6,8 +6,8 @@ The project is designed as an incremental model-development platform: establish 
 
 ## What This Project Demonstrates
 
-- PyTorch model development, training, and autograd workflows
-- Transformer architecture design, including multi-scale deformable attention
+- PyTorch model development and training workflows
+- Transformer architecture design and implementation
 - CNN feature extraction and multi-scale vision representations
 - Hungarian matching and DETR classification, L1, and GIoU losses
 - Waymo Open Dataset v2 loading from local storage or Google Cloud Storage
