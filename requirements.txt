@@ -15,7 +15,7 @@ Pillow==11.3.0
 # Visualization
 matplotlib==3.10.1
 seaborn==0.13.0
-tensorboard==2.15.1
+tensorboard==2.20.0
 rerun-sdk==0.23.0
 
 # Jupyter and interactive
