@@ -73,7 +73,7 @@ The reusable metric implementation is in [src/utils/metrics.py](src/utils/metric
 
 For long-running experiments, use the checkpointed notebook:
 
-[Open the Deformable DETR Colab notebook](https://colab.research.google.com/github/yharidy/object_detection/blob/main/notebooks/train_deformable_detr_checkpointed_colab.ipynb)
+[Open the Deformable DETR Colab notebook](https://colab.research.google.com/github/yharidy/object_detection/blob/main/notebooks/Train_Deformable_DETR_Colab.ipynb)
 
 The notebook supports:
 
