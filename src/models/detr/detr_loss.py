@@ -72,8 +72,7 @@ class DETRLoss:
                 ``[N, 4]``.
 
         Returns:
-            Scalar tensor containing weighted classification, L1, and GIoU
-            losses.
+            total_loss, class_loss, box_loss, giou_loss
         """
         if logits.shape[-1] != self.num_classes + 1:
             raise ValueError(
@@ -111,13 +110,12 @@ class DETRLoss:
             giou = self.matcher._calculate_giou_cost(pred_xyxy, gt_xyxy)
             giou_loss = 1.0 - giou.mean()
 
-        return (
+        total = (
             self.class_loss_weight * class_loss
             + self.box_loss_weight * box_loss
             + self.giou_loss_weight * giou_loss
         )
-
-    calculate_detr_loss = compute_detr_loss
+        return total, class_loss.detach(), box_loss.detach(), giou_loss.detach()
 
     def __call__(self, pred_logits, pred_boxes, target_labels, target_boxes):
         """Average the per-image DETR loss across a batch.
@@ -131,15 +129,21 @@ class DETRLoss:
 
         Returns:
             Mean scalar loss over the batch.
+            dict containing loss components.
         """
-        losses = []
+        totals, class_losses, box_losses, giou_losses = [], [], [], []
         for i in range(len(target_labels)):
-            losses.append(
-                self.compute_detr_loss(
-                    pred_logits[i],
-                    pred_boxes[i],
-                    target_labels[i],
-                    target_boxes[i],
-                )
+            total, c, b, g = self.compute_detr_loss(
+                self, pred_logits[i], pred_boxes[i], target_labels[i], target_boxes[i]
             )
-        return torch.stack(losses).mean()
+            totals.append(total)
+            class_losses.append(c)
+            box_losses.append(b)
+            giou_losses.append(g)
+        mean_total = torch.stack(totals).mean()
+        components = {
+            "class": torch.stack(class_losses).mean().item(),
+            "box": torch.stack(box_losses).mean().item(),
+            "giou": torch.stack(giou_losses).mean().item(),
+        }
+        return mean_total, components
