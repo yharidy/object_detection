@@ -134,7 +134,7 @@ class DETRLoss:
         totals, class_losses, box_losses, giou_losses = [], [], [], []
         for i in range(len(target_labels)):
             total, c, b, g = self.compute_detr_loss(
-                self, pred_logits[i], pred_boxes[i], target_labels[i], target_boxes[i]
+                pred_logits[i], pred_boxes[i], target_labels[i], target_boxes[i]
             )
             totals.append(total)
             class_losses.append(c)
