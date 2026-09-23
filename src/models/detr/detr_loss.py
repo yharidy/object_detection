@@ -39,7 +39,13 @@ class DETRLoss:
         self.class_loss_weight = class_loss_weight
         self.box_loss_weight = box_loss_weight
         self.giou_loss_weight = giou_loss_weight
-        self.matcher = Matcher(image_width=image_width, image_height=image_height)
+        self.matcher = Matcher(
+            image_width=image_width,
+            image_height=image_height,
+            class_cost_weight=class_loss_weight,
+            bbox_cost_weight=box_loss_weight,
+            giou_cost_weight=giou_loss_weight,
+        )
 
     def _normalize_boxes(self, boxes: torch.Tensor) -> torch.Tensor:
         """Convert pixel-space ``cxcywh`` boxes to normalized ``cxcywh``."""
