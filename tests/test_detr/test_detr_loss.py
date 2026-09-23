@@ -40,11 +40,11 @@ def test_detr_loss_returns_scalar_for_single_image():
         )
     ]
 
-    loss = loss_fn(pred_logits, pred_boxes, gt_labels, gt_boxes)
+    mean_total_loss, _ = loss_fn(pred_logits, pred_boxes, gt_labels, gt_boxes)
 
-    assert torch.is_tensor(loss)
-    assert loss.ndim == 0
-    assert torch.isfinite(loss)
+    assert torch.is_tensor(mean_total_loss)
+    assert mean_total_loss.ndim == 0
+    assert torch.isfinite(mean_total_loss)
 
 
 def test_detr_loss_handles_empty_ground_truth():
@@ -59,8 +59,8 @@ def test_detr_loss_handles_empty_ground_truth():
     gt_labels = [torch.empty(0, dtype=torch.long)]
     gt_boxes = [torch.empty((0, 4), dtype=torch.float32)]
 
-    loss = loss_fn(pred_logits, pred_boxes, gt_labels, gt_boxes)
+    mean_total_loss, _ = loss_fn(pred_logits, pred_boxes, gt_labels, gt_boxes)
 
-    assert torch.is_tensor(loss)
-    assert loss.ndim == 0
-    assert torch.isfinite(loss)
+    assert torch.is_tensor(mean_total_loss)
+    assert mean_total_loss.ndim == 0
+    assert torch.isfinite(mean_total_loss)

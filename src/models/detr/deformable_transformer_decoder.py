@@ -222,10 +222,11 @@ class DeformableTransformerDecoder(nn.Module):
             input_padding_mask: The padding mask for the encoder output of shape [B, S] or None.
 
         Returns:
-            A tuple ``(queries, boxes, class_logits)``. Queries have shape
-            ``[B, num_queries, query_dim]``; boxes have normalized ``cxcywh``
-            coordinates with shape ``[B, num_queries, 4]``; and class logits
-            have shape ``[B, num_queries, num_classes + 1]``.
+            A tuple ``(queries, intermediate_boxes, intermediate_logits)``.
+                - Queries have shape ``[B, num_queries, query_dim]``
+                - intermediate_boxes is a list of the boxes predicted by each layer, each having normalized ``cxcywh``
+                    coordinates with shape ``[B, num_queries, 4]``
+                - intermediate_logits is a list of the class logits predicted by each layer, each having the shape ``[B, num_queries, num_classes + 1]``.
         """
         if input_padding_mask is None:
             input_padding_mask = torch.zeros(
@@ -244,6 +245,8 @@ class DeformableTransformerDecoder(nn.Module):
             .expand(-1, -1, self.num_levels, -1)
         )  # [B, n_queries, n_levels, 2]
 
+        intermediate_boxes = []
+        intermediate_logits = []
         for decoder, box_refinement in zip(self.decoder_layers, self.box_refinements):
             queries = decoder(
                 encoder_memory=encoder_output,
@@ -263,10 +266,15 @@ class DeformableTransformerDecoder(nn.Module):
             reference_points = (
                 self._inverse_sigmoid(reference_points) + box_offsets[..., :2]
             ).sigmoid()  # [B, n_queries, n_levels, 2]
+            boxes = torch.cat(
+                (reference_points, box_offsets[..., 2:].sigmoid()), dim=-1
+            )[
+                :, :, 0, :
+            ]  # [B, n_queries, 4]
+            intermediate_boxes.append(boxes)
+            class_logits = self.classification_head(
+                queries
+            )  # [B, n_queries, num_classes]
+            intermediate_logits.append(class_logits)
 
-        boxes = torch.cat((reference_points, box_offsets[..., 2:].sigmoid()), dim=-1)[
-            :, :, 0, :
-        ]  # [B, n_queries, 4]
-        class_logits = self.classification_head(queries)  # [B, n_queries, num_classes]
-
-        return queries, boxes, class_logits
+        return queries, intermediate_boxes, intermediate_logits

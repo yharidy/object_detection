@@ -48,20 +48,24 @@ def test_decoder_stack_returns_queries_boxes_and_class_logits():
     spatial_shapes = torch.tensor([[2, 2], [1, 2]], dtype=torch.long)
     level_start_index = torch.tensor([0, 4], dtype=torch.long)
 
-    queries, boxes, class_logits = decoder(
+    queries, intermediate_boxes, intermediate_logits = decoder(
         encoder_output=encoder_memory,
         spatial_shapes=spatial_shapes,
         level_start_index=level_start_index,
     )
 
     assert queries.shape == (2, 3, 8)
-    assert boxes.shape == (2, 3, 4)
-    assert class_logits.shape == (2, 3, 92)
-    assert (boxes >= 0).all()
-    assert (boxes <= 1).all()
     assert torch.isfinite(queries).all()
-    assert torch.isfinite(boxes).all()
-    assert torch.isfinite(class_logits).all()
+    assert len(intermediate_boxes) == 2
+    assert len(intermediate_logits) == 2
+    for boxes in intermediate_boxes:
+        assert boxes.shape == (2, 3, 4)
+        assert (boxes >= 0).all()
+        assert (boxes <= 1).all()
+        assert torch.isfinite(boxes).all()
+    for class_logits in intermediate_logits:
+        assert class_logits.shape == (2, 3, 92)
+        assert torch.isfinite(class_logits).all()
 
 
 def test_decoder_layer_rejects_invalid_activation():
