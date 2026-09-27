@@ -9,6 +9,43 @@ from torchvision.models._utils import IntermediateLayerGetter
 from .position_embedding import PositionEmbeddingSine
 
 
+class FrozenBatchNorm2d(nn.Module):
+    """BatchNorm2d with fixed statistics and affine parameters (no batch
+    statistics, no gradient updates) -- standard practice for fine-tuning a
+    pretrained backbone at small batch sizes."""
+
+    def __init__(self, num_features: int):
+        super().__init__()
+        self.register_buffer("weight", torch.ones(num_features))
+        self.register_buffer("bias", torch.zeros(num_features))
+        self.register_buffer("running_mean", torch.zeros(num_features))
+        self.register_buffer("running_var", torch.ones(num_features))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # y = w * (x - rm)/ sqrt(rv+eps) + b
+        eps = 1e-5
+        w = self.weight.reshape(1, -1, 1, 1)  # reshape to [B. C, W, H]
+        b = self.bias.reshape(1, -1, 1, 1)
+        rv = self.running_var.reshape(1, -1, 1, 1)
+        rm = self.running_mean.reshape(1, -1, 1, 1)
+        scale = w * (rv + eps).rsqrt()
+        return x * scale + (b - rm * scale)
+
+
+def _freeze_batchnorm(module: nn.Module) -> nn.Module:
+    for name, child in module.named_children():
+        if isinstance(child, nn.BatchNorm2d):
+            frozen = FrozenBatchNorm2d(child.num_features)
+            frozen.weight.data.copy_(child.weight.data)
+            frozen.bias.data.copy_(child.bias.data)
+            frozen.running_mean.data.copy_(child.running_mean.data)
+            frozen.running_var.data.copy_(child.running_var.data)
+            setattr(module, name, frozen)
+        else:
+            _freeze_batchnorm(child)
+    return module
+
+
 class BackboneWithPositionEmbedding(nn.Module):
     """Extract projected multi-scale ResNet-18 features and 2D positions.
 
@@ -41,6 +78,7 @@ class BackboneWithPositionEmbedding(nn.Module):
         self.backbone = resnet18(
             weights=ResNet18_Weights.DEFAULT if pretrained else None
         )
+        self.backbone = _freeze_batchnorm(self.backbone)
         self.levels = {f"layer{i}": f"layer{i}" for i in range(1, num_levels + 1)}
         self.backbone_with_interm_layers = IntermediateLayerGetter(
             self.backbone,
