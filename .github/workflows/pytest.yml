@@ -1,14 +1,15 @@
-name: pytest
+name: Tests
 on:
   push:
-    branches:
-      -"**"
+      branches:
+      - "**"
+
 
 jobs:
   pytest:
     runs-on: ubuntu-latest
 
-    steps:
+    steps: 
       - name: checkout repository
         uses: actions/checkout@v4
       
