@@ -113,7 +113,8 @@ class DETRLoss:
 
             pred_xyxy = cxcywh_to_xyxy(matched_boxes)
             gt_xyxy = cxcywh_to_xyxy(matched_gt_boxes_norm)
-            giou = self.matcher._calculate_giou_cost(pred_xyxy, gt_xyxy)
+            giou_matrix = self.matcher._calculate_giou_cost(pred_xyxy, gt_xyxy)
+            giou = torch.diagonal(giou_matrix)
             giou_loss = 1.0 - giou.mean()
 
         total = (
